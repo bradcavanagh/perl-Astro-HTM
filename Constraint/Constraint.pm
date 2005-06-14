@@ -15,7 +15,12 @@ use Carp;
 use Math::Trig qw/ acos /;
 use Math::VectorReal;
 
+use Astro::HTM::Constants qw/ :all /;
+
 our $VERSION = '0.01';
+
+# Overload stringification.
+use overload '""' => 'to_string';
 
 =head1 METHODS
 
@@ -33,9 +38,9 @@ Create a new instance of an C<Astro::HTM::Constraint> object.
 A Constraint is essentially a cone on the sky-sphere. It is
 characterized by its direction and the distance of the cutting plane
 from the origin. For the Perl constructor these parameters are defined
-by a Math::VectorReal object denoting the direction, and a real number
+by a C<Math::VectorReal> object denoting the direction, and a real number
 denoting the distance. Both components must be defined, and the vector
-need not be normalised, but it will be normalised internally.
+need not be normalized, but it will be normalized internally.
 
 =cut
 
@@ -58,6 +63,7 @@ sub new {
   my $constraint = {};
   $constraint->{DIRECTION} = $args{'direction'}->norm;
   $constraint->{DISTANCE} = $args{'distance'};
+  $constraint->{SIGN} = ( $constraint->{DISTANCE} < 0 ? HTM__NEGATIVE : HTM__POSITIVE );
 
   bless( $constraint, $class );
   return $constraint;
@@ -69,6 +75,22 @@ sub new {
 
 =over 4
 
+=item B<angle>
+
+Return the opening angle of the Constraint.
+
+  my $angle = $constraint->angle();
+
+This method returns the angle in radians as a real number.
+
+=cut
+
+sub angle {
+  my $self = shift;
+
+  return acos( $self->distance );
+}
+
 =item B<direction>
 
 Set or return the direction of the Constraint.
@@ -77,7 +99,8 @@ Set or return the direction of the Constraint.
   $constraint->direction( $direction );
 
 This method returns a C<Math::VectorReal> object, and takes
-a C<Math::VectorReal> object.
+a C<Math::VectorReal> object. The direction is automatically normalized
+to a unit vector.
 
 =cut
 
@@ -100,7 +123,9 @@ sub direction {
 Set or return the distance of the cutting plane.
 
   my $distance = $constraint->distance();
-  $constraint->distance( 2.0 );
+  $constraint->distance( 0.5  );
+
+This method returns a real number.
 
 =cut
 
@@ -110,10 +135,30 @@ sub distance {
   if( @_ ) {
     my $distance = shift;
     $self->{DISTANCE} = $distance;
+
+    # Set the sign.
+    $self->{SIGN} = ( $self->{DISTANCE} < 0 ? HTM__NEGATIVE : HTM__POSITIVE );
   }
 
   return $self->{DISTANCE};
+}
 
+=item B<sign>
+
+Return the sign of the C<Astro::HTM::Constraint> object.
+
+  my $sign = $constraint->sign();
+
+Returns a constant as defined in C<Astro::HTM::Constants>.
+
+Note that this method cannot be used to set the sign; this can only
+be done by modifying the distance with the C<distance()> method.
+
+=cut
+
+sub sign {
+  my $self = shift;
+  return $self->{SIGN};
 }
 
 =back
@@ -154,7 +199,7 @@ sub contains {
   # The requested vector is inside the constraint if the arccosine of the
   # dot product of the two is less than the arccosine of the distance of
   # the cutting plane from the centre of the sphere.
-  return ( acos( $self->direction . $vector ) < acos( $self->distance ) );
+  return ( acos( $self->direction . $vector ) < $self->angle );
 
 }
 
@@ -171,21 +216,21 @@ object essentially flips the sign of the distance.
 
 sub invert {
   my $self = shift;
-  $self->{DISTANCE} *= -1;
+  $self->distance( -1 * $self->distance );
 }
 
-=item B<toString>
+=item B<to_string>
 
 Stringify an C<Astro::HTM::Constraint> object.
 
-  $constraint->toString();
+  $constraint->to_string();
 
 An C<Astro::HTM::Constraint> object stringifies into four numbers,
 the x, y, and z components of the vector, and the distance.
 
 =cut
 
-sub toString {
+sub to_string {
   my $self = shift;
   return $self->direction->stringify( "%g %g %g" ) . " " . $self->distance;
 }
