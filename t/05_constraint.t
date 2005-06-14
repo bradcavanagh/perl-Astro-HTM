@@ -1,7 +1,7 @@
 #!perl
 
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 15;
 
 use Math::VectorReal;
 
