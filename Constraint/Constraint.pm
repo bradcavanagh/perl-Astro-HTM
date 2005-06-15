@@ -219,6 +219,48 @@ sub invert {
   $self->distance( -1 * $self->distance );
 }
 
+=item B<test>
+
+Test for constraint relative position - intersect, one inside the other,
+or disjoint.
+
+  my $test = $constraint->test( $constraint2 );
+
+The sole mandatory argument must be an C<Astro::HTM::Constraint> object.
+
+This method returns 0 if the two constraints intersect, -1 if they
+are disjoint, 1 if $constraint2 is in $constraint, and 2 if $constraint
+is in $constraint2 (using the above example).
+
+=cut
+
+sub test {
+  my $self = shift;
+
+  my $constraint = shift;
+  if( ! defined( $constraint ) ||
+      ! UNIVERSAL::isa( $constraint, "Astro::HTM::Constraint" ) ) {
+    croak "Must pass Astro::HTM::Constraint to test() method";
+  }
+
+  my $phi = ( ( $self->sign == HTM__NEGATIVE ? $self->direction * -1 : $self->direction ) . ( $constraint->sign == HTM__NEGATIVE ? $constraint->direction * -1 : $constraint->direction ) );
+  $phi = ( ( $phi <= -1.0 + HTM__EPSILON ) ? HTM__PI : acos( $phi ) );
+
+  my $a1 = ( $self->sign == HTM__POSITIVE ? $self->angle : HTM__PI - $self->angle );
+  my $a2 = ( $constraint->sign == HTM__POSITIVE ? $constraint->angle : HTM__PI - $constraint->angle );
+
+  if( $phi > ( $a1 + $a2 ) ) {
+    return -1;
+  }
+  if( $a1 > ( $phi + $a2 ) ) {
+    return 1;
+  }
+  if( $a2 > ( $phi + $a1 ) ) {
+    return 2;
+  }
+  return 0;
+}
+
 =item B<to_string>
 
 Stringify an C<Astro::HTM::Constraint> object.
