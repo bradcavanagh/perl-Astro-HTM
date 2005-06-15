@@ -136,7 +136,7 @@ sub add_convex {
     croak "Must supply Astro::HTM::Convex object to add_convex() method";
   }
 
-  push $self->{CONVEXES}, $convex;
+  push @{$self->{CONVEXES}}, $convex;
 }
 
 =item B<add_domain>
@@ -167,7 +167,7 @@ sub add_domain {
 
   my @convexes = $domain->convexes;
 
-  push $self->{CONVEXES}, @convexes;
+  push @{$self->{CONVEXES}}, @convexes;
 }
 
 =item B<clear>
