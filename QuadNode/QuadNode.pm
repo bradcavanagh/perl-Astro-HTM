@@ -25,18 +25,18 @@ our $VERSION = '0.01';
 Create a new instance of an C<Astro::HTM::QuadNode> object.
 
   $quadnode = new Astro::HTM::QuadNode( index => $index,
-                                        v => @v,
-                                        w => @w,
-                                        child_id => @child_id,
+                                        v => \@v,
+                                        w => \@w,
+                                        child_id => \@child_id,
                                         parent => $parent,
                                         id => $id );
 
 =cut
 
 struct( 'Astro::HTM::QuadNode' => { index => '$',
-                                    v => '@',
-                                    w => '@',
-                                    child_id => '@',
+                                    v => '*@',
+                                    w => '*@',
+                                    child_id => '*@',
                                     parent => '$',
                                     id => '$',
                                   } );
