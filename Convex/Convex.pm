@@ -13,6 +13,7 @@ use warnings::register;
 use Carp;
 
 use Math::VectorReal;
+use Math::Trig qw/ acos /;
 
 use Astro::HTM::Constraint;
 use Astro::HTM::Constants qw/ :all /;
@@ -442,6 +443,87 @@ sub contains {
   return 0;
 }
 
+=item B<esolve>
+
+Solve the quadratic equation for the edge given by endpoints vector1, vector2,
+of the constraint at a given index.
+
+  my $solution = $self->esolve( vector1 => $vector1,
+                                vector2 => $vector2,
+                                cindex => $cindex );
+
+This method returns true if a solution can be found, false otherwise.
+
+=cut
+
+sub esolve {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::esolve() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::esolve() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'cindex'} ) ) {
+    croak "cindex must be passed to Astro::HTM::Convex::esolve()";
+  }
+  my $cindex = $args{'cindex'};
+
+  my $con = $self->get_constraint( $cindex );
+  my $gamma1 = $vector1 . $con->direction;
+  my $gamma2 = $vector2 . $con->direction;
+  my $mu = $vector1 . $vector2;
+  my $u2 = ( 1 - $mu ) / ( 1 + $mu );
+
+  my $a = -1.0 * $u2 * ( $gamma1 + $con->distance );
+  my $b = $gamma1 * ( $u2 - 1 ) + $gamma2 * ( $u2 + 1 );
+  my $c = $gamma1 - $con->distance;
+
+  my $D = $b * $b - 4 * $a * $c;
+
+  if( $D < 0 ) {
+    return 0;
+  }
+
+  my $q = -0.5 * ( $b + ( ( $b > 0 ? -1 : ( $b > 0 ? 1 : 0 ) ) * sqrt( $D ) ) );
+
+  my $root1 = -1;
+  my $root2 = -1;
+  my $i = 0;
+
+  if( $a > HTM__GEPSILON || $a < -1.0 * HTM__GEPSILON ) {
+    $root1 = $q / $a;
+    $i++;
+  }
+  if( $q > HTM__GEPSILON || $q < -1.0 * HTM__GEPSILON ) {
+    $root2 = $c / $q;
+    $i++;
+  }
+
+  if( $i == 0 ) {
+    return 0;
+  }
+  if( ( $root1 >= 0 ) && ( $root1 <= 1 ) ) {
+    return 1;
+  }
+  if( $i == 2 && ( ( ( $root1 >= 0 ) && ( $root1 <= 1 ) ) ||
+                   ( ( $root2 >= 0 ) && ( $root2 <= 1 ) ) ) ) {
+    return 1;
+  }
+
+  return 0;
+}
+
+
 =item B<get_constraint>
 
 Get a constraint by index.
@@ -530,7 +612,35 @@ sub intersect {
   }
 
   for( my $i = 1; $i <= 8; $i++ ) {
-    $self->test_trixel( $i, $index, $range, $varlen );
+    $self->test_trixel( id => $i,
+                        index => $index,
+                        range => $range,
+                        varlen => $varlen );
+  }
+}
+
+=item B<print_sign>
+
+Print the convex's size.
+
+  my $string = $convex->print_sign();
+
+=cut
+
+sub print_sign {
+  my $self = shift;
+
+  if( $self->sign == HTM__POSITIVE ) {
+    return "pOS";
+  }
+  if( $self->sign == HTM__NEGATIVE ) {
+    return "nEG";
+  }
+  if( $self->sign == HTM__MIXED ) {
+    return "mIXED";
+  }
+  if( $self->sign == HTM__ZERO ) {
+    return "zERO";
   }
 }
 
@@ -623,7 +733,8 @@ sub save_trixel {
   my ( $level, $i, $shifts, $lo, $hi );
 
   if( $varlen ) {
-    $range->merge_range( $htmid, $htmid );
+    $range->merge_range( htmid1 => $htmid,
+                         htmid2 => $htmid );
     return;
   }
 
@@ -645,7 +756,8 @@ sub save_trixel {
     $lo = $hi = $htmid;
   }
 
-  $range->merge_range( $lo, $hi );
+  $range->merge_range( htmid1 => $lo,
+                       htmid2 => $hi );
 
 }
 
@@ -1070,6 +1182,897 @@ sub simplify_zero {
   }
 }
 
+=item B<test_bounding_circle>
+
+Test if a bounding circle intersects with a constraint.
+
+  my $test = $convex->test_bounding_circle( vector1 => $vector1,
+                                            vector2 => $vector2,
+                                            vector3 => $vector3 );
+
+This method returns true if a constraint contained by the convex
+intersects with the bounding circle defined by the three vectors,
+and false otherwise.
+
+=cut
+
+sub test_bounding_circle {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  # Set the correct direction: the normal vector to the triangle plane.
+  my $c = ( $vector2 - $vector1 ) x ( $vector3 - $vector2 );
+  $c->norm;
+
+  # Set the correct opening angle.
+  my $d = acos( $c . $vector1 );
+
+  if( $self->sign == HTM__NEGATIVE ) {
+    my $bc = $self->bounding_circle;
+    my $tst = $c . $bc->direction;
+    if( ( ( $tst < ( -1.0 + HTM__GEPSILON ) ) ? HTM__PI : acos( $tst ) ) >
+        ( $d + $bc->angle ) ) {
+      return 0;
+    } else {
+      return 1;
+    }
+  }
+
+  my $i;
+  for( $i = 0; $i < scalar( $self->constraints ); $i++ ) {
+    my $ci = $self->get_constraint( $i );
+    my $cci = $c . $ci->direction;
+    if( ( ( $cci < ( -1.0 + HTM__GEPSILON ) ) ? HTM__PI : acos( $cci ) ) >
+        ( $d + $ci->angle ) ) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+=item B<test_constraint_inside>
+
+Test for a constraint lying inside or outside of the triangle denoted by the
+three vectors:
+
+  my $test = $self->test_constraint_inside( vector1 => $vector1,
+                                            vector2 => $vector2,
+                                            vector3 => $vector3,
+                                            cindex => $cindex );
+
+Returns true if the constraint denoted by index cindex lies inside the triangle,
+false otherwise.
+
+=cut
+
+sub test_constraint_inside {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  if( ! defined( $args{'cindex'} ) ) {
+    croak "cindex must be passed to Astro::HTM::Convex::test_constraint_inside()";
+  }
+  my $cindex = $args{'cindex'};
+
+  my $constraint = $self->get_constraint( $cindex );
+
+  return $self->test_vector_inside( vector1 => $vector1,
+                                    vector2 => $vector2,
+                                    vector3 => $vector3,
+                                    vector4 => $constraint->direction );
+}
+
+=item B<test_edge>
+
+Test if a constraint intersects with one of the edges of the node
+with corners vector1, vector2, vector3:
+
+  my $test = $convex->test_edge( vector1 => $vector1,
+                                 vector2 => $vector2,
+                                 vector3 => $vector3 );
+
+This method returns true if a constraint contained by the convex intersects
+with one of the edges of the given node, and false otherwise.
+
+=cut
+
+sub test_edge {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  for( my $i = 0; $i < scalar( $self->constraints ); $i++ ) {
+    my $constraint = $self->get_constraint( $i );
+
+    # Only test holes. (why?)
+    if( $constraint->sign == HTM__NEGATIVE ) {
+      if( $self->esolve( vector1 => $vector1,
+                         vector2 => $vector2,
+                         cindex => $i ) ) {
+        return 1;
+      }
+      if( $self->esolve( vector1 => $vector2,
+                         vector2 => $vector3,
+                         cindex => $i ) ) {
+        return 1;
+      }
+      if( $self->esolve( vector1 => $vector3,
+                         vector2 => $vector1,
+                         cindex => $i ) ) {
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+=item B<test_edge_constraint>
+
+Test if a constraint intersects the edges:
+
+  my $test = $convex->test_edge_constraint( vector1 => $vector1,
+                                            vector2 => $vector2,
+                                            vector3 => $vector3,
+                                            cindex => $cindex );
+
+This method returns true if the constraint given by index cindex intersects
+with one of the edges of the node with the corners given by the three vectors,
+and false otherwise.
+
+=cut
+
+sub test_edge_constraint {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  if( ! defined( $args{'cindex'} ) ) {
+    croak "cindex must be passed to Astro::HTM::Convex::test_edge_constraint()";
+  }
+  my $cindex = $args{'cindex'};
+
+  if( $self->esolve( vector1 => $vector1,
+                     vector2 => $vector2,
+                     cindex => $cindex ) ) {
+    return 1;
+  }
+  if( $self->esolve( vector1 => $vector2,
+                     vector2 => $vector3,
+                     cindex => $cindex ) ) {
+    return 1;
+  }
+  if( $self->esolve( vector1 => $vector3,
+                     vector2 => $vector1,
+                     cindex => $cindex ) ) {
+    return 1;
+  }
+  return 0;
+}
+
+=item B<test_edge_zero>
+
+Test the edges of a triangle against the edges of an HTM__ZERO convex.
+
+  my $test = $convex->test_edge_zero( vector1 => $vector1,
+                                      vector2 => $vector2,
+                                      vector3 => $vector3 );
+
+This method returns true or false.
+
+=cut
+
+sub test_edge_zero {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  # Create an 'edge_struct' structure.
+  use Class::Struct edge_struct => { e => 'Math::VectorReal',
+                                     l => '$',
+                                     e1 => 'Math::VectorReal',
+                                     e2 => 'Math::VectorReal',
+                                   };
+
+  my @edge;
+  for( my $i = 0; $i < 3; $i++ ) {
+    $edge[$i] = new edge_struct;
+  }
+
+  # Fill the edge structure for each side of the triangle.
+  $edge[0]->e( $vector1 x $vector2 );
+  $edge[0]->e1( $vector1 );
+  $edge[0]->e2( $vector2 );
+  $edge[0]->l( acos( $vector1 . $vector2 ) );
+  $edge[1]->e( $vector2 x $vector3 );
+  $edge[1]->e1( $vector2 );
+  $edge[1]->e2( $vector3 );
+  $edge[1]->l( acos( $vector2 . $vector3 ) );
+  $edge[2]->e( $vector3 x $vector1 );
+  $edge[2]->e1( $vector3 );
+  $edge[2]->e1( $vector1 );
+  $edge[2]->l( acos( $vector3 . $vector1 ) );
+
+  for( my $i = 0; $i < scalar( $self->corners ); $i++ ) {
+    my $j = 0;
+    if( $i < scalar( $self->corners ) - 1 ) {
+      $j = $i + 1;
+    }
+    my $ci = $self->get_corner( $i );
+    my $cj = $self->get_corner( $j );
+    my $cedgelen = acos( $ci . $cj );
+
+    for( my $iedge = 0; $iedge < 3; $iedge++ ) {
+
+      my $a1 = $edge[$iedge]->e x ( $ci x $cj );
+      $a1->norm;
+
+      # If the intersection $a1 is inside the edge of the convex,
+      # its distance to the corners is smaller than the edgelength.
+      # This test has to be done for both the edge of the convex and
+      # the edge of the triangle.
+      for( my $k = 0; $k < 2; $k++ ) {
+        my $l1 = acos( $ci . $a1 );
+        my $l2 = acos( $cj . $a1 );
+        if( ( $l1 - $cedgelen <= HTM__GEPSILON ) &&
+            ( $l2 - $edge[$iedge]->l <= HTM__GEPSILON ) ) {
+          $l1 = acos( $edge[$iedge]->e1 . $a1 );
+          $l2 = acos( $edge[$iedge]->e2 . $a1 );
+          if( ( $l1 - $edge[$iedge]->l <= HTM__GEPSILON ) &&
+              ( $l2 - $edge[$iedge]->l <= HTM__GEPSILON ) ) {
+
+            return 1;
+          }
+        }
+        $a1 = $a1 * -1; # Do the same for the other intersection.
+      }
+    }
+  }
+
+  return $self->test_vector_inside( vector1 => $vector1,
+                                    vector2 => $vector2,
+                                    vector3 => $vector3,
+                                    vector4 => $self->get_corner( 0 ) );
+
+}
+
+=item B<test_hole>
+
+Test for negative constraints that have their centres inside the node with the three
+corners v0, v1, and v2:
+
+  my $hole = $self->test_hole( vector1 => $vector1,
+                               vector2 => $vector2,
+                               vector3 => $vector3 );
+
+This method returns true or false.
+
+=cut
+
+sub test_hole {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  my $test = 0;
+  for( my $i = 0; $i < scalar( $self->constraints ); $i++ ) {
+    my $ci = $self->get_constraint( $i );
+    if( $ci->sign == HTM__NEGATIVE ) {
+
+      if( ( ( $vector1 x $vector2 ) . $ci->direction ) > 0.0 ) {
+        next;
+      }
+      if( ( ( $vector2 x $vector3 ) . $ci->direction ) > 0.0 ) {
+        next;
+      }
+      if( ( ( $vector3 x $vector1 ) . $ci->direction ) > 0.0 ) {
+        next;
+      }
+      $test = 1;
+      last;
+    }
+  }
+
+  return $test;
+
+}
+
+=item B<test_node>
+
+  my $mark = $convex->test_node( node_index => $node_index,
+                                 index => $index );
+
+The node_index argument is an integer, and the index argument is an C<Astro::HTM::Index>
+object.
+
+This method returns a markup constant as described in the :markup tag section of
+C<Astro::HTM::Constants>.
+
+=cut
+
+sub test_node {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'node_index'} ) ) {
+    croak "Node index must be passed to Astro::HTM::Convex::test_node()";
+  }
+  my $node_index = $args{'node_index'};
+
+  if( ! defined( $args{'index'} ) ||
+      ! UNIVERSAL::isa( $args{'index'}, "Astro::HTM::Index" ) ) {
+    croak "Index must be passed to Astro::HTM::Convex::test_node() as an Astro::HTM::Index object";
+  }
+  my $index = $args{'index'};
+
+  # Start with testing the vertices for the QuadNode with this index.
+  my $N = $index->get_node( $node_index );
+
+  my $quadnode_vertices = $N->v;
+  my $quadnode_childids = $N->child_id;
+
+  my $V0 = $index->get_vertex( $quadnode_vertices->[0] );
+  my $V1 = $index->get_vertex( $quadnode_vertices->[1] );
+  my $V2 = $index->get_vertex( $quadnode_vertices->[2] );
+
+  my $vsum = $self->test_vertex( vector => $V0 ) +
+             $self->test_vertex( vector => $V1 ) +
+             $self->test_vertex( vector => $V2 );
+
+  my $mark = $self->test_triangle( vector1 => $V0,
+                                   vector2 => $V1,
+                                   vector3 => $V2,
+                                   vsum => $vsum );
+
+  # If we are down at the leaf nodes here, $mark will be HTM__MARKUP_DONTKNOW
+  # really, but since these are the leaf nodes here and we want to be on the
+  # safe side, mark them as HTM__MARKUP_PARTIAL.
+  if( ( $quadnode_childids->[0] == 0 ) && ( $mark == HTM__MARKUP_DONTKNOW ) ) {
+    $mark = HTM__MARKUP_PARTIAL;
+  }
+
+  return $mark;
+}
+
+=item B<test_node_vectors>
+
+Test three vectors.
+
+  my $mark = $self->test_node_vectors( vector1 => $vector1,
+                                       vector2 => $vector2,
+                                       vector3 => $vector3 );
+
+The three arguments are all mandatory and must be C<Math::VectorReal> objects.
+
+This method returns a markup constant as described in the :markup tag section of
+C<Astro::HTM::Constants>.
+
+=cut
+
+sub test_node_vectors {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  my $vsum = $self->test_vertex( vector => $vector1 ) + $self->test_vertex( vector => $vector2 ) + $self->test_vertex( vector => $vector3 );
+  my $mark = $self->test_triangle( vector1 => $vector1,
+                                   vector2 => $vector2,
+                                   vector3 => $vector3,
+                                   vsum => $vsum );
+
+  if( $mark == HTM__MARKUP_DONTKNOW ) {
+    $mark = HTM__MARKUP_PARTIAL;
+  }
+
+  return $mark;
+
+}
+
+=item B<test_other_pos_none>
+
+Find a positive constraint that does not intersect the edges of the node given
+by three vectors:
+
+  my $constraint_index = $convex->test_other_pos_none( vector1 => $vector1,
+                                                       vector2 => $vector2,
+                                                       vector3 => $vector3 );
+
+Returns the constraint index if one is found, 0 otherwise.
+
+=cut
+
+sub test_other_pos_none {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_node_vectors() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  my $i = 1;
+  if( scalar( $self->constraints ) > 1 ) {
+    my $constraint = $self->get_constraint( $i );
+    while( ( $i < scalar( $self->constraints ) ) &&
+           ( $constraint->sign == HTM__POSITIVE ) ) {
+
+      if( ! $self->test_edge_constraint( vector1 => $vector1,
+                                         vector2 => $vector2,
+                                         vector3 => $vector3,
+                                         cindex => $i ) ) {
+        return $i;
+      }
+      $i++;
+      $constraint = $self->get_constraint( $i );
+    }
+  }
+
+  return 0;
+}
+
+=item B<test_partial>
+
+  $convex->test_partial( level => $level,
+                         id => $id,
+                         vector1 => $vector1,
+                         vector2 => $vector2,
+                         vector3 => $vector3,
+                         pprev => $pprev,
+                         index => $index,
+                         range => $range,
+                         varlen => $varlen );
+
+The level, id, pprev, and varlen arguments are integers, vector0, vector1, and
+vector2 are C<Math::VectorReal> objects, index is an C<Astro::HTM::Index> object,
+and range is an C<Astro::HTM::Range> object.
+
+=cut
+
+sub test_partial {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'level'} ) ) {
+    croak "Level must be passed to Astro::HTM::Convex::test_partial()";
+  }
+  my $level = $args{'level'};
+
+  if( ! defined( $args{'id'} ) ) {
+    croak "ID must be passed to Astro::HTM::Convex::test_partial()";
+  }
+  my $id = $args{'id'};
+
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_partial() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_partial() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_partial() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  if( ! defined( $args{'pprev'} ) ) {
+    croak "pprev must be passed to Astro::HTM::Convex::test_partial()";
+  }
+  my $pprev = $args{'pprev'};
+
+  if( ! defined( $args{'index'} ) ||
+      ! UNIVERSAL::isa( $args{'index'}, "Astro::HTM::Index" ) ) {
+    croak "Index must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Index object";
+  }
+  my $index = $args{'index'};
+
+  if( ! defined( $args{'range'} ) ||
+      ! UNIVERSAL::isa( $args{'range'}, "Astro::HTM::Range" ) ) {
+    croak "Range must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Range object";
+  }
+  my $range = $args{'range'};
+
+  my $varlen;
+  if( ! defined( $args{'varlen'} ) ) {
+    $varlen = 0;
+  } else {
+    $varlen = $args{'varlen'};
+  }
+
+  # Done with arguments, now set up some variables.
+  my ( @ids, $id0, $m, $P, $F, @m );
+  $P = 0;
+  $F = 0;
+
+  my $w0 = $vector2 + $vector3;
+  my $w1 = $vector1 + $vector3;
+  my $w2 = $vector2 + $vector1;
+  $w0->norm;
+  $w1->norm;
+  $w2->norm;
+
+  $ids[0] = $id0 = $id << 2;
+  $ids[1] = $id0 + 1;
+  $ids[2] = $id0 + 2;
+  $ids[3] = $id0 + 3;
+
+  $m[0] = $self->test_node_vectors( vector1 => $vector1,
+                                    vector2 => $w2,
+                                    vector3 => $w1 );
+  $m[1] = $self->test_node_vectors( vector1 => $vector2,
+                                    vector2 => $w0,
+                                    vector3 => $w2 );
+  $m[2] = $self->test_node_vectors( vector1 => $vector3,
+                                    vector2 => $w1,
+                                    vector3 => $w0 );
+  $m[3] = $self->test_node_vectors( vector1 => $w0,
+                                    vector2 => $w1,
+                                    vector3 => $w2 );
+
+  for( my $i = 0; $i < 4; $i++ ) {
+    if( $m[$i] == HTM__MARKUP_FULL ) {
+      $F++;
+    }
+    if( $m[$i] == HTM__MARKUP_PARTIAL ) {
+      $P++;
+    }
+  }
+
+  # Several interesting cases for saving this (the parent) trixel.
+  # Case P==4, all four children are partials, so pretend parent is full, we save
+  # and return.
+  # Case P==3, and F==1, most of the parent is in, so pretend that parent is
+  # full again
+  # Case P==2 or 3, but the previous testPartial had three partials, so parent
+  # was in an arc as opposed to previous partials being fewer, so parent was in
+  # a tiny corner...
+  if( ( $level-- <= 0 ) ||
+      ( ( $P == 4 ) ||
+        ( $F >= 2 ) ||
+        ( $P == 3 && $F == 1 ) ||
+        ( $P > 1 && $pprev == 3 ) ) ) {
+    $self->save_trixel( htmid => $id,
+                        range => $range,
+                        varlen => $varlen );
+    return;
+  } else {
+    for( my $i = 0; $i < 4; $i++ ) {
+      if( $m[$i] == HTM__MARKUP_FULL ) {
+        $self->save_trixel( htmid => $ids[$i],
+                            range => $range,
+                            varlen => $varlen );
+      }
+    }
+
+    # Look at the four kids again for partials.
+    if( $m[0] == HTM__MARKUP_PARTIAL ) {
+      $self->test_partial( level => $level,
+                           id => $ids[0],
+                           vector1 => $vector1,
+                           vector2 => $w2,
+                           vector3 => $w1,
+                           pprev => $P,
+                           index => $index,
+                           range => $range,
+                           varlen => $varlen );
+    }
+    if( $m[1] == HTM__MARKUP_PARTIAL ) {
+      $self->test_partial( level => $level,
+                           id => $ids[1],
+                           vector1 => $vector2,
+                           vector2 => $w0,
+                           vector3 => $w2,
+                           pprev => $P,
+                           index => $index,
+                           range => $range,
+                           varlen => $varlen );
+    }
+    if( $m[2] == HTM__MARKUP_PARTIAL ) {
+      $self->test_partial( level => $level,
+                           id => $ids[2],
+                           vector1 => $vector3,
+                           vector2 => $w1,
+                           vector3 => $w2,
+                           pprev => $P,
+                           index => $index,
+                           range => $range,
+                           varlen => $varlen );
+    }
+    if( $m[3] == HTM__MARKUP_PARTIAL ) {
+      $self->test_partial( level => $level,
+                           id => $ids[3],
+                           vector1 => $w0,
+                           vector2 => $w1,
+                           vector3 => $w2,
+                           pprev => $P,
+                           index => $index,
+                           range => $range,
+                           varlen => $varlen );
+    }
+  }
+}
+
+=item B<test_triangle>
+
+Test a triangle given by three vertices if it intersects the convex.
+
+  $test = $convex->test_triangle( vector1 => $vector1,
+                                  vector2 => $vector2,
+                                  vector3 => $vector3,
+                                  vsum => $vsum );
+
+The three vectors must be C<Math::VectorReal> objects. vsum must be an integer.
+
+This method returns a markup constant as described in the :markup tag section of
+C<Astro::HTM::Constants>.
+
+=cut
+
+sub test_triangle {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_triangle() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_triangle() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_triangle() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  if( ! defined( $args{'vsum'} ) ) {
+    croak "vsum must be passed to Astro::HTM::Convex::test_triangle()";
+  }
+  my $vsum = $args{'vsum'};
+
+  # Quick check for partial.
+  if( $vsum == 1 || $vsum == 2 ) {
+    return HTM__MARKUP_PARTIAL;
+  }
+
+  # Check for vsum == 3.
+  if( $vsum == 3 ) {
+    if( $self->sign == HTM__POSITIVE || $self->sign == HTM__ZERO ) {
+      return HTM__MARKUP_FULL;
+    }
+    if( $self->test_hole( vector1 => $vector1,
+                          vector2 => $vector2,
+                          vector3 => $vector3 ) ) {
+      return HTM__MARKUP_PARTIAL;
+    }
+    if( $self->test_edge( vector1 => $vector1,
+                          vector2 => $vector2,
+                          vector3 => $vector3 ) ) {
+      return HTM__MARKUP_PARTIAL;
+    }
+    return HTM__MARKUP_FULL;
+  }
+
+  # If we've reached this far, we have vsum == 0.
+  if( ! $self->test_bounding_circle( vector1 => $vector1,
+                                     vector2 => $vector2,
+                                     vector3 => $vector3 ) ) {
+    return HTM__MARKUP_REJECT;
+  }
+  if( ( $self->sign == HTM__POSITIVE ) ||
+      ( $self->sign == HTM__MIXED ) ||
+      ( $self->sign == HTM__ZERO && scalar( $self->constraints ) == 2 ) ) {
+    if( $self->test_edge_constraint( vector1 => $vector1,
+                                     vector2 => $vector2,
+                                     vector3 => $vector3,
+                                     cindex => 0 ) ) {
+
+      my $cindex = $self->test_other_pos_none( vector1 => $vector1,
+                                               vector2 => $vector2,
+                                               vector3 => $vector3 );
+      if( $cindex > 0 ) {
+
+        my $cindex_constraint = $self->get_constraint( $cindex );
+
+        if( $self->test_constraint_inside( vector1 => $vector1,
+                                           vector2 => $vector2,
+                                           vector3 => $vector3,
+                                           cindex => $cindex ) ) {
+          return HTM__MARKUP_PARTIAL;
+        } elsif( $cindex_constraint->contains( $vector1 ) ) {
+          return HTM__MARKUP_PARTIAL;
+        } else {
+          return HTM__MARKUP_REJECT;
+        }
+      } else {
+        if( $self->sign == HTM__POSITIVE || $self->sign == HTM__ZERO ) {
+          return HTM__MARKUP_PARTIAL;
+        } else {
+          return HTM__MARKUP_DONTKNOW;
+        }
+      }
+    } else {
+      if( $self->sign == HTM__POSITIVE || $self->sign == HTM__ZERO ) {
+        if( $self->test_constraint_inside( vector1 => $vector1,
+                                           vector2 => $vector2,
+                                           vector3 => $vector3,
+                                           cindex => 0 ) ) {
+          return HTM__MARKUP_PARTIAL;
+        } else {
+          return HTM__MARKUP_REJECT;
+        }
+      } else {
+        return HTM__MARKUP_DONTKNOW;
+      }
+    }
+  } elsif( $self->sign == HTM__ZERO ) {
+    if( scalar( $self->corners ) > 0 && $self->test_edge_zero( vector1 => $vector1,
+                                                               vector2 => $vector2,
+                                                               vector3 => $vector3 ) ) {
+      return HTM__MARKUP_PARTIAL;
+    } else {
+      return HTM__MARKUP_REJECT;
+    }
+  }
+
+  return HTM__MARKUP_PARTIAL;
+
+}
+
 =item B<test_trixel>
 
 This is the main test of a trixel vs. a Convex.
@@ -1118,11 +2121,13 @@ sub test_trixel {
 
   my $index_node = $index->get_node( $id );
 
-  $mark = $self->test_node( $id, $index )
+  $mark = $self->test_node( id => $id, index => $index );
 
   if( $mark == HTM__MARKUP_FULL ) {
     $tid = $index_node->id;
-    $self->save_trixel( $tid, $range, $varlen );
+    $self->save_trixel( htmid => $tid,
+                        range => $range,
+                        varlen => $varlen );
     return $mark;
   } elsif( $mark == HTM__MARKUP_REJECT ) {
     $tid = $index_node->id;
@@ -1134,36 +2139,181 @@ sub test_trixel {
 
     $tid = $index_node->id;
     $child_id = $index_node->get_childid( 0 );
-    $self->test_trixel( $child_id, $index, $range, $varlen );
+    $self->test_trixel( id => $child_id,
+                        index => $index,
+                        range => $range,
+                        varlen => $varlen );
 
     $child_id = $index_node->get_childid( 1 );
-    $self->test_trixel( $child_id, $index, $range, $varlen );
+    $self->test_trixel( id => $child_id,
+                        index => $index,
+                        range => $range,
+                        varlen => $varlen );
 
     $child_id = $index_node->get_childid( 2 );
-    $self->test_trixel( $child_id, $index, $range, $varlen );
+    $self->test_trixel( id => $child_id,
+                        index => $index,
+                        range => $range,
+                        varlen => $varlen );
 
     $child_id = $index_node->get_childid( 3 );
-    $self->test_trixel( $child_id, $index, $range, $varlen );
+    $self->test_trixel( id => $child_id,
+                        index => $index,
+                        range => $range,
+                        varlen => $varlen );
 
   } else {
 
     if( $index->get_addlevel > 0 ) {
 
-      $self->test_partial( $index->addlevel,
-                           $index_node->id,
-                           $index->get_vertex( $index_node->get_v(0) ),
-                           $index->get_vertex( $index_node->get_v(1) ),
-                           $index->get_vertex( $index_node->get_v(2) ),
-                           0,
-                           $index,
-                           $range,
-                           $varlen );
+      $self->test_partial( level => $index->addlevel,
+                           id => $index_node->id,
+                           vector1 => $index->get_vertex( $index_node->get_v(0) ),
+                           vector2 => $index->get_vertex( $index_node->get_v(1) ),
+                           vector3 => $index->get_vertex( $index_node->get_v(2) ),
+                           pprev => 0,
+                           index => $index,
+                           range => $range,
+                           varlen => $varlen );
     } else {
-      $self->save_trixel( $index_node->id, $range, $varlen );
+      $self->save_trixel( htmid => $index_node->id,
+                          range => $range,
+                          varlen => $varlen );
     }
   }
 
   return $mark;
 }
+
+=item B<test_vector_inside>
+
+Test if a given vector lies within a triangle whose corners are
+three other vectors.
+
+  my $test = $self->test_vector_inside( vector1 => $vector1,
+                                        vector2 => $vector2,
+                                        vector3 => $vector3,
+                                        vector4 => $vector4 );
+
+This method returns true if vector4 lies within the triangle whose
+corners are the other three vectors, and false otherwise.
+
+=cut
+
+sub test_vector_inside {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector1'} ) ||
+      ! UNIVERSAL::isa( $args{'vector1'}, "Math::VectorReal" ) ) {
+    croak "vector1 must be passed to Astro::HTM::Convex::test_vector_inside() as a Math::VectorReal object";
+  }
+  my $vector1 = $args{'vector1'};
+
+  if( ! defined( $args{'vector2'} ) ||
+      ! UNIVERSAL::isa( $args{'vector2'}, "Math::VectorReal" ) ) {
+    croak "vector2 must be passed to Astro::HTM::Convex::test_vector_inside() as a Math::VectorReal object";
+  }
+  my $vector2 = $args{'vector2'};
+
+  if( ! defined( $args{'vector3'} ) ||
+      ! UNIVERSAL::isa( $args{'vector3'}, "Math::VectorReal" ) ) {
+    croak "vector3 must be passed to Astro::HTM::Convex::test_vector_inside() as a Math::VectorReal object";
+  }
+  my $vector3 = $args{'vector3'};
+
+  if( ! defined( $args{'vector4'} ) ||
+      ! UNIVERSAL::isa( $args{'vector4'}, "Math::VectorReal" ) ) {
+    croak "vector4 must be passed to Astro::HTM::Convex::test_vector_inside() as a Math::VectorReal object";
+  }
+  my $vector4 = $args{'vector4'};
+
+  if( ( ( ( $vector1 x $vector2 ) . $vector4 ) < 0 ) ||
+      ( ( ( $vector2 x $vector3 ) . $vector4 ) < 0 ) ||
+      ( ( ( $vector3 x $vector1 ) . $vector4 ) < 0 ) ) {
+    return 0;
+  }
+  return 1;
+}
+
+=item B<test_vertex>
+
+Test if a given vertex is inside the vertex.
+
+  my $test = $self->test_vertex( vector => $vector );
+
+Returns true or false.
+
+=cut
+
+sub test_vertex {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+  if( ! defined( $args{'vector'} ) ||
+      ! UNIVERSAL::isa( $args{'vector'}, "Math::VectorReal" ) ) {
+    croak "Vector passed to Astro::HTM::Convex::test_vertex() must be a Math::VectorReal object";
+  }
+  my $vector = $args{'vector'};
+
+  for( my $i = 0; $i < scalar( $self->constraints ); $i++ ) {
+    my $ci = $self->get_constraint( $i );
+    if( $ci->direction . $vector < $ci->distance ) {
+      return 0;
+    }
+  }
+  return 1;
+}
+
+=item B<to_string>
+
+Stringify an C<Astro::HTM::Convex> object.
+
+  my $string = $convex->to_string();
+
+=cut
+
+sub to_string {
+  my $self = shift;
+
+  my $string = "#CONVEX\n" . scalar( $self->constraints ) . " " . $self->print_sign() . "\n";
+  foreach my $constraint ( $self->constraints ) {
+    $string .= "$constraint\n";
+  }
+
+  return $string;
+}
+
+=back
+
+=head1 REVISION
+
+$Id$
+
+=head1 AUTHORS
+
+Brad Cavanagh E<lt>b.cavanagh@jach.hawaii.eduE<gt>
+
+=head1 COPYRIGHT
+
+Copyright (C) 2005 Particle Physics and Astronomy Research
+Council.  All Rights Reserved.
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful,but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place,Suite 330, Boston, MA  02111-1307, USA
+
+=cut
 
 1;
