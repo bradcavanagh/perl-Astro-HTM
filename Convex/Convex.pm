@@ -157,7 +157,9 @@ sub new {
 
   bless( $convex, $class );
 
-  $convex->simplify();
+  if( scalar( @args ) != 0 ) {
+    $convex->simplify();
+  }
 
   return $convex;
 }
@@ -943,8 +945,6 @@ sub simplify {
     }
   }
 }
-
-=back
 
 =item B<simplify_zero>
 
