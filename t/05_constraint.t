@@ -25,8 +25,8 @@ my $angle = sprintf( "%.8f", $constraint->angle );
 ok( $angle == 1.04719755, "Angle is 1.04719755 radians" );
 
 # Check the distance. It should be 0.5.
-my $distance = $constraint->distance;
-ok( $distance == 0.5, "Distance is 0.5" );
+my $check_distance = $constraint->distance;
+ok( $check_distance == 0.5, "Distance is 0.5" );
 
 # Check the directional vector. Its length should be 1. Stringifying
 # it using the format "[ %.5f %.5f %.5f ]" should give
