@@ -92,6 +92,9 @@ C<Astro::HTM::Domain> object.
 This method returns an integer. If the output level has not been
 defined, it will default to 20.
 
+This method also sets the output level for all contained convexes
+to the desired output level.
+
 =cut
 
 sub olevel {
@@ -99,9 +102,16 @@ sub olevel {
   if( @_ ) {
     my $olevel = shift;
     $self->{OLEVEL} = $olevel;
+
+    foreach my $convex ( $self->convexes ) {
+      $convex->olevel( $olevel );
+    }
   }
   if( ! defined( $self->{OLEVEL} ) ) {
     $self->{OLEVEL} = 20;
+    foreach my $convex ( $self->convexes ) {
+      $convex->olevel( 20 );
+    }
   }
   return $self->{OLEVEL};
 }
@@ -136,7 +146,11 @@ sub add_convex {
     croak "Must supply Astro::HTM::Convex object to add_convex() method";
   }
 
+  # Set the convex's output level to the domain's output level.
+  $convex->olevel( $self->olevel );
+
   push @{$self->{CONVEXES}}, $convex;
+
 }
 
 =item B<add_domain>
@@ -230,12 +244,124 @@ sub contains {
   return 0;
 }
 
+=item B<get_convex>
+
+Get a convex by index.
+
+  my $convex = $domain->get_convex( $i );
+
+This method returns an C<Astro::HTM::Convex> object. If the index
+is out of bounds on the array, this method will return undef;
+
+=cut
+
+sub get_convex {
+  my $self = shift;
+  my $index = shift;
+
+  if( ! defined( $index ) ) {
+    croak "Convex index must be passed to Astro::HTM::Domain::get_convex()";
+  }
+
+  if( $index > scalar( $self->convexes ) ||
+      $index < 0 ) {
+    return undef;
+  }
+
+  return $self->{CONVEXES}->[$index];
+}
+
 =item B<intersect>
 
 Return the range set of the nodes that are intersected by this
 C<Astro::HTM::Domain> object.
 
+  $domain->intersect( index => $index,
+                      range => $range,
+                      varlen => $varlen );
 
+The index must be defined as an C<Astro::HTM::Index> object, the
+range must be defined as an C<Astro::HTM::Range> object, and the
+varlen must be 0 or 1.
+
+Setting varlen to true (1) makes this method adaptive, giving
+HTM ranges of different levels suiting the shape of the area.
+
+=cut
+
+sub intersect {
+  my $self = shift;
+
+  # Deal with arguments.
+  my %args = @_;
+
+  if( ! defined( $args{'index'} ) ||
+      ! UNIVERSAL::isa( $args{'index'}, "Astro::HTM::Index" ) ) {
+    croak "Index must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Index
+ object";
+  }
+  my $index = $args{'index'};
+
+  if( ! defined( $args{'range'} ) ||
+      ! UNIVERSAL::isa( $args{'range'}, "Astro::HTM::Range" ) ) {
+    croak "Range must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Range
+ object";
+  }
+  my $range = $args{'range'};
+
+  my $varlen;
+  if( ! defined( $args{'varlen'} ) ) {
+    $varlen = 0;
+  } else {
+    $varlen = $args{'varlen'};
+  }
+
+  my $i;
+  for( $i = 0; $i < scalar( $self->convexes ); $i++ ) {
+    my $convex = $self->get_convex( $i );
+    $convex->intersect( index => $index,
+                        range => $range,
+                        varlen => $varlen );
+  }
+
+  return 1;
+}
+
+=item B<simplify>
+
+Call the C<Astro::HTM::Convex::simplify()> method for all convexes.
+
+  $domain->simplify();
+
+This method takes no arguments.
+
+=cut
+
+sub simplify {
+  my $self = shift;
+  foreach my $convex ( $self->convexes ) {
+    $convex->simplify();
+  }
+}
+
+=item B<to_string>
+
+Stringify an C<Astro::HTM::Domain> object.
+
+  my $string = $domain->to_string();
+
+=cut
+
+sub to_string {
+  my $self = shift;
+
+  my $string = "#DOMAIN\n" . scalar( $self->convexes ) . "\n";
+  foreach my $convex ( $self->convexes ) {
+    $string .= $convex->to_string;
+  }
+
+  return $string;
+}
 
 =back
 
