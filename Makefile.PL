@@ -7,6 +7,7 @@ WriteMakefile(
               'NAME' => 'Astro::HTM',
               'VERSION_FROM' => 'HTM.pm',
               'PREREQ_PM' => {
+                              'Class::Struct' => 0,
                               'Math::VectorReal' => 0,
                              },
               'DIR' => [
