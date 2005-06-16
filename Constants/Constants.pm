@@ -34,8 +34,10 @@ my @id = qw/ HTM__IDSIZE HTM__IDHIGHBIT HTM__IDHIGHBIT2 HTM__HTMNAMEMAX
 my @markup = qw/ HTM__MARKUP_DONTKNOW HTM__MARKUP_PARTIAL HTM__MARKUP_SWALLOWED
                  HTM__MARKUP_FULL HTM__MARKUP_REJECT HTM__MARKUP_VTRUE
                  HTM__MARKUP_VFALSE HTM__MARKUP_VUNDEF /;
+my @base = qw/ HTM__BASE_IN0 HTM__BASE_IN1 HTM__BASE_IN2 HTM__BASE_IN3
+               HTM__BASE_IS0 HTM__BASE_IS1 HTM__BASE_IS2 HTM__BASE_IS3 /;
 
-@EXPORT_OK = ( @sign, @math, @id, @markup );
+@EXPORT_OK = ( @sign, @math, @id, @markup, @base );
 
 %EXPORT_TAGS = (
                 'all' => [ @EXPORT_OK ],
@@ -43,6 +45,7 @@ my @markup = qw/ HTM__MARKUP_DONTKNOW HTM__MARKUP_PARTIAL HTM__MARKUP_SWALLOWED
                 'math' => \@math,
                 'id' => \@id,
                 'markup' => \@markup,
+                'base' => \@base,
                );
 
 Exporter::export_tags( keys %EXPORT_TAGS );
@@ -242,6 +245,60 @@ use constant HTM__MARKUP_VUNDEF => 0;
 
 =back
 
+=head2 Base Constants
+
+=over 4
+
+=item B<HTM__BASE_IN0>
+
+=cut
+
+use constant HTM__BASE_IN0 => 5;
+
+=item B<HTM__BASE_IN1>
+
+=cut
+
+use constant HTM__BASE_IN1 => 1;
+
+=item B<HTM__BASE_IN2>
+
+=cut
+
+use constant HTM__BASE_IN2 => 3;
+
+=item B<HTM__BASE_IN3>
+
+=cut
+
+use constant HTM__BASE_IN3 => 7;
+
+=item B<HTM__BASE_IS0>
+
+=cut
+
+use constant HTM__BASE_IS0 => 6;
+
+=item B<HTM__BASE_IS1>
+
+=cut
+
+use constant HTM__BASE_IS1 => 2;
+
+=item B<HTM__BASE_IS2>
+
+=cut
+
+use constant HTM__BASE_IS2 => 0;
+
+=item B<HTM__BASE_IS3>
+
+=cut
+
+use constant HTM__BASE_IS3 => 4;
+
+=back
+
 =head1 TAGS
 
 Individual sets of constants can be imported by including the module with
@@ -259,13 +316,10 @@ The available tags are:
 
 Import all constants.
 
-=item :sign
+=item :base
 
-HTM__POSITIVE, HTM__NEGATIVE, HTM__MIXED, HTM__ZERO.
-
-=item :math
-
-HTM__EPSILON, HTM__GEPSILON, HTM__PI, HTM__PI_RADIANS, HTM__SQRT_THREE.
+HTM__BASE_IN0, HTM__BASE_IN1, HTM__BASE_IN2, HTM__BASE_IN3, HTM__BASE_IS0,
+HTM__BASE_IS1, HTM__BASE_IS2, HTM__BASE_IS3.
 
 =item :id
 
@@ -276,6 +330,14 @@ HTM__IDSIZE, HTM__IDHIGHBIT, HTM__IDHIGHBIT2, HTM__HTMNAMEMAX, HTM__INVALID_ID.
 HTM__MARKUP_DONTKNOW, HTM__MARKUP_PARTIAL, HTM__MARKUP_SWALLOWED,
 HTM__MARKUP_FULL, HTM__MARKUP_REJECT, HTM__MARKUP_VTRUE, HTM__MARKUP_VFALSE,
 HTM__MARKUP_VUNDEF.
+
+=item :math
+
+HTM__EPSILON, HTM__GEPSILON, HTM__PI, HTM__PI_RADIANS, HTM__SQRT_THREE.
+
+=item :sign
+
+HTM__POSITIVE, HTM__NEGATIVE, HTM__MIXED, HTM__ZERO.
 
 =back
 
