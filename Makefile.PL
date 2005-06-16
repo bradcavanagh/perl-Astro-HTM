@@ -15,6 +15,7 @@ WriteMakefile(
                         'Constraint',
                         'Convex',
                         'Domain',
+                        'Index',
                         'QuadNode',
                        ],
               ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
