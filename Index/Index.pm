@@ -139,7 +139,7 @@ sub configure {
 
   for( my $i = 0; $i < 6; $i++ ) {
     my $sv = vector( $v[$i] );
-    $self->add_vertex( $sv );
+    $self->add_vertex( $i, $sv );
   }
 
   # Create the first eight nodes, index one through 8.
@@ -283,17 +283,6 @@ sub stored_leaves {
 
 =over 4
 
-=item B<add>
-
-=cut
-
-sub add {
-  my $self = shift;
-  my $vector = shift;
-  my $i = shift;
-
-  $
-
 =item B<add_node>
 
 =cut
@@ -311,9 +300,13 @@ sub add_node {
 
 sub add_vertex {
   my $self = shift;
+  my $i = shift;
   my $vertex = shift;
 
-  push @{$self->{VERTICES}}, $vertex;
+  splice( @{$self->{VERTICES}},
+          $i,
+          ( -1 - $i ),
+          ( $vertex, @{$self->{VERTICES}}[$i+1..-1] ) );
 }
 
 =item B<area>
@@ -395,8 +388,6 @@ sub get_vertex {
   return $vertices->[$x];
 }
 
-
-
 =item B<id_by_leaf_number>
 
 =cut
@@ -406,6 +397,17 @@ sub id_by_leaf_number {
   my $leaf = shift;
 
   return ( scalar( $self->leaves ) + $leaf );
+}
+
+=item B<is_leaf>
+
+=cut
+
+sub is_leaf {
+  my $self = shift;
+  my $i = shift;
+
+  return ( ( $i < $self->last_saved_leaf_index ) ? 1 : 0 );
 }
 
 =item B<leaf_number_by_id>
@@ -419,28 +421,50 @@ sub leaf_number_by_id {
   return ( $id - scalar( $self->leaves ) );
 }
 
-=item B<lookup>
+=item B<lookup_radec>
 
 =cut
 
-sub lookup {
+sub lookup_radec {
   my $self = shift;
   my $ra = shift;
   my $dec = shift;
 
-  return lookup( $ra, $dec, $self->maxlevel );
+  return lookup_radec( $ra, $dec, $self->maxlevel );
 }
 
-=item B<lookup_id>
+=item B<lookup_radec_id>
 
 =cut
 
-sub lookup_id {
+sub lookup_radec_id {
   my $self = shift;
   my $ra = shift;
   my $dec = shift;
 
-  return lookup_id( $ra, $dec, $self->maxlevel );
+  return lookup_radec_id( $ra, $dec, $self->maxlevel );
+}
+
+=item B<lookup_vector>
+
+=cut
+
+sub lookup_vector {
+  my $self = shift;
+  my $vector = shift;
+
+  return lookup_vector( $vector->x, $vector->y, $vector->z, $self->maxlevel );
+}
+
+=item B<lookup_vector_id>
+
+=cut
+
+sub lookup_vector_id {
+  my $self = shift;
+  my $vector = shift;
+
+  return lookup_vector_id( $vector->x, $vector->y, $vector->z, $self->maxlevel );
 }
 
 =item B<make_new_layer>
