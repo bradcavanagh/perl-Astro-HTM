@@ -31,9 +31,9 @@ ok( $check_distance == 0.5, "Distance is 0.5" );
 # Check the directional vector. Its length should be 1. Stringifying
 # it using the format "[ %.5f %.5f %.5f ]" should give
 # "[ 0.26726 0.53452 0.80178 ]"
-my $direction = $constraint->direction;
-ok( $direction->length == 1, "Direction vector length is 1" );
-ok( $direction->stringify( "[ %.5f %.5f %.5f ]" ) eq
+my $check_direction = $constraint->direction;
+ok( $check_direction->length == 1, "Direction vector length is 1" );
+ok( $check_direction->stringify( "[ %.5f %.5f %.5f ]" ) eq
     "[ 0.26726 0.53452 0.80178 ]", "Direction vector is [ 0.26726 0.53452 0.80178 ]" );
 
 # Check the sign. It should be equal to the constant HTM__POSITIVE.
@@ -59,6 +59,6 @@ ok( $invert_sign == HTM__NEGATIVE, "Inverted sign is HTM__NEGATIVE" );
 my $invert_dist = $constraint->distance;
 ok( $invert_dist == -0.5, "Inverted distance is -0.5" );
 my $invert_dir = $constraint->direction;
-ok( $direction->stringify( "[ %.5f %.5f %.5f ]" ) eq
+ok( $invert_dir->stringify( "[ %.5f %.5f %.5f ]" ) eq
     "[ 0.26726 0.53452 0.80178 ]", "Inverted direction vector is [ 0.26726 0.53452 0.80178 ]" );
 
