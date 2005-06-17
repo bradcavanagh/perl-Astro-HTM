@@ -36,8 +36,14 @@ my @markup = qw/ HTM__MARKUP_DONTKNOW HTM__MARKUP_PARTIAL HTM__MARKUP_SWALLOWED
                  HTM__MARKUP_VFALSE HTM__MARKUP_VUNDEF /;
 my @base = qw/ HTM__BASE_IN0 HTM__BASE_IN1 HTM__BASE_IN2 HTM__BASE_IN3
                HTM__BASE_IS0 HTM__BASE_IS1 HTM__BASE_IS2 HTM__BASE_IS3 /;
+my @range = qw/ HTM__RANGE_LOWS HTM__RANGE_HIGHS HTM__RANGE_INSIDE
+                HTM__RANGE_OUTSIDE HTM__RANGE_INTERSECT
+                HTM__RANGE_GAP_HISTO_SIZE HTM__RANGE_SKIP_PROB
+                HTM__RANGE_INCL_OUTSIDE HTM__RANGE_INCL_INSIDE
+                HTM__RANGE_INCL_LO HTM__RANGE_INCL_HI
+                HTM__RANGE_INCL_ADJACENT_XXX /;
 
-@EXPORT_OK = ( @sign, @math, @id, @markup, @base );
+@EXPORT_OK = ( @sign, @math, @id, @markup, @base, @range );
 
 %EXPORT_TAGS = (
                 'all' => [ @EXPORT_OK ],
@@ -46,6 +52,7 @@ my @base = qw/ HTM__BASE_IN0 HTM__BASE_IN1 HTM__BASE_IN2 HTM__BASE_IN3
                 'id' => \@id,
                 'markup' => \@markup,
                 'base' => \@base,
+                'range' => \@range,
                );
 
 Exporter::export_tags( keys %EXPORT_TAGS );
@@ -299,6 +306,84 @@ use constant HTM__BASE_IS3 => 4;
 
 =back
 
+=head2 Range Constants
+
+=over 4
+
+=item B<HTM__RANGE_LOWS>
+
+=cut
+
+use constant HTM__RANGE_LOWS => 1;
+
+=item B<HTM__RANGE_HIGHS>
+
+=cut
+
+use constant HTM__RANGE_HIGHS => 2;
+
+=item B<HTM__RANGE_INSIDE>
+
+=cut
+
+use constant HTM__RANGE_INSIDE => 1;
+
+=item B<HTM__RANGE_OUTSIDE>
+
+=cut
+
+use constant HTM__RANGE_OUTSIDE => -1;
+
+=item B<HTM__RANGE_INTERSECT>
+
+=cut
+
+use constant HTM__RANGE_INTERSECT => 0;
+
+=item B<HTM__RANGE_GAP_HISTO_SIZE>
+
+=cut
+
+use constant HTM__RANGE_GAP_HISTO_SIZE => 10000;
+
+=item B<HTM__RANGE_SKIP_PROB>
+
+=cut
+
+use constant HTM__RANGE_SKIP_PROB => 0.5;
+
+=item B<HTM__RANGE_INCL_OUTSIDE>
+
+=cut
+
+use constant HTM__RANGE_INCL_OUTSIDE => 0;
+
+=item B<HTM__RANGE_INCL_INSIDE>
+
+=cut
+
+use constant HTM__RANGE_INCL_INSIDE => 1;
+
+=item B<HTM__RANGE_INCL_LO>
+
+=cut
+
+use constant HTM__RANGE_INCL_LO => 1;
+
+=item B<HTM__RANGE_INCL_HI>
+
+=cut
+
+use constant HTM__RANGE_INCL_HI => 1;
+
+=item B<HTM__RANGE_INCL_ADJACENT_XXX>
+
+=cut
+
+use constant HTM__RANGE_INCL_ADJACENT_XXX => 1;
+
+=back
+
 =head1 TAGS
 
 Individual sets of constants can be imported by including the module with
@@ -334,6 +419,13 @@ HTM__MARKUP_VUNDEF.
 =item :math
 
 HTM__EPSILON, HTM__GEPSILON, HTM__PI, HTM__PI_RADIANS, HTM__SQRT_THREE.
+
+=item :range
+
+HTM__RANGE_LOWS, HTM__RANGE_HIGHS, HTM__RANGE_INSIDE, HTM__RANGE_OUTSIDE,
+HTM__RANGE_INTERSECT, HTM__RANGE_GAP_HISTO_SIZE, HTM__RANGE_SKIP_PROB,
+HTM__RANGE_INCL_OUTSIDE, HTM__RANGE_INCL_INSIDE, HTM__RANGE_INCL_LO,
+HTM__RANGE_INCL_HI, HTM__RANGE_INCL_ADJACENT_XXX.
 
 =item :sign
 
