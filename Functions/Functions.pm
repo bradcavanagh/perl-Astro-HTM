@@ -24,6 +24,8 @@ use warnings;
 use warnings::register;
 use Carp;
 
+use Data::Dumper;
+
 use Math::Trig qw/ acos /;
 use Math::VectorReal;
 
@@ -44,19 +46,20 @@ use Class::Struct 'Astro::HTM::Base' => { name => '$',
                                         };
 
 our $VERSION = '0.01';
+our $DEBUG = 0;
 
 # Set up some global variables.
 my @n0 = ( 1, 0, 4 );
 my @n1 = ( 4, 0, 3 );
 my @n2 = ( 3, 0, 2 );
 my @n3 = ( 2, 0, 1 );
-my @N_indexes = ( @n0, @n1, @n2, @n3 );
+my @N_indexes = ( [ @n0 ], [ @n1 ], [ @n2 ], [ @n3 ] );
 
 my @s0 = ( 1, 5, 2 );
 my @s1 = ( 2, 5, 3 );
 my @s2 = ( 3, 5, 4 );
 my @s3 = ( 4, 5, 1 );
-my @S_indexes = ( @s0, @s1, @s2, @s3 );
+my @S_indexes = ( [ @s0 ], [ @s1 ], [ @s2 ], [ @s3 ] );
 
 my @a0 = ( 0, 0, 1 );
 my @a1 = ( 1, 0, 0 );
@@ -64,7 +67,7 @@ my @a2 = ( 0, 1, 0 );
 my @a3 = ( -1, 0, 0 );
 my @a4 = ( 0, -1, 0 );
 my @a5 = ( 0, 0, -1 );
-my @anchor = ( @a0, @a1, @a2, @a3, @a4, @a5 );
+my @anchor = ( [ @a0 ], [ @a1 ], [ @a2 ], [ @a3 ], [ @a4 ], [ @a5 ] );
 
 my @bases = ( new Astro::HTM::Base( name => 'S2',
                                     ID => 10,
@@ -88,7 +91,7 @@ my @bases = ( new Astro::HTM::Base( name => 'S2',
                                      v3 => 2 ),
               new Astro::HTM::Base ( name => 'S3',
                                      ID => 11,
-                                     v1 => 5,
+                                     v1 => 4,
                                      v2 => 5,
                                      v3 => 1 ),
               new Astro::HTM::Base ( name => 'N0',
@@ -146,21 +149,32 @@ sub startpane {
   }
 
   $baseID = $bases[$baseindex]->ID;
+  print "baseID = $baseID\n" if $DEBUG;
+  print "baseindex = $baseindex\n" if $DEBUG;
+  print "bases baseindex v1 = " . $bases[$baseindex]->v1 . "\n" if $DEBUG;
+  print "bases baseindex v2 = " . $bases[$baseindex]->v2 . "\n" if $DEBUG;
+  print "bases baseindex v3 = " . $bases[$baseindex]->v3 . "\n" if $DEBUG;
 
-  @tvec = $anchor[$bases[$baseindex]->v1];
-  $v1->[0] = $tvec[0];
-  $v1->[1] = $tvec[1];
-  $v1->[2] = $tvec[2];
+  @tvec = @anchor[$bases[$baseindex]->v1];
+  print "tvec:\n" if $DEBUG;
+  print Dumper \@tvec if $DEBUG;
+  $v1->[0] = $tvec[0][0];
+  $v1->[1] = $tvec[0][1];
+  $v1->[2] = $tvec[0][2];
 
-  @tvec = $anchor[$bases[$baseindex]->v2];
-  $v2->[0] = $tvec[0];
-  $v2->[1] = $tvec[1];
-  $v2->[2] = $tvec[2];
+  @tvec = @anchor[$bases[$baseindex]->v2];
+  print "tvec:\n" if $DEBUG;
+  print Dumper \@tvec if $DEBUG;
+  $v2->[0] = $tvec[0][0];
+  $v2->[1] = $tvec[0][1];
+  $v2->[2] = $tvec[0][2];
 
-  @tvec = $anchor[$bases[$baseindex]->v3];
-  $v3->[0] = $tvec[0];
-  $v3->[1] = $tvec[1];
-  $v3->[2] = $tvec[2];
+  @tvec = @anchor[$bases[$baseindex]->v3];
+  print "tvec:\n" if $DEBUG;
+  print Dumper \@tvec if $DEBUG;
+  $v3->[0] = $tvec[0][0];
+  $v3->[1] = $tvec[0][1];
+  $v3->[2] = $tvec[0][2];
 
   ${$name_ref} .= $bases[$baseindex]->name;
   return $baseID;
@@ -246,14 +260,17 @@ sub id_to_name {
   my $self = shift;
 
   my $id = shift; # scalar
-
+print "id = $id\n" if $DEBUG;
   my $size = 0;
   my $i;
   my $c;
 
   for( $i = 0; $i < HTM__IDSIZE; $i+=2 ) {
+print "i = $i\n" if $DEBUG;
     my $x8 = ( ( $id << $i ) & HTM__IDHIGHBIT );
+print "calculated x8 = $x8\n" if $DEBUG;
     my $x4 = ( ( $id << $i ) & HTM__IDHIGHBIT2 );
+print "calculated x4 = $x4\n" if $DEBUG;
     if( $x8 != 0 ) {
       last;
     }
@@ -266,9 +283,14 @@ sub id_to_name {
     croak "ID $id is invalid";
   }
 
+  $size = ( HTM__IDSIZE - $i ) >> 1;
+  print "size is $size\n" if $DEBUG;
+
   my $name = '';
   for( $i = 0; $i < $size - 1; $i++ ) {
+print "i = $i\n" if $DEBUG;
     $c = ( ( $id >> ( $i * 2 ) ) & 3 );
+print "adding $c to front of $name\n" if $DEBUG;
     $name = $c . $name;
   }
   if( ( ( $id >> ( $size * 2 - 2 ) ) & 1 ) > 0 ) {
@@ -305,11 +327,9 @@ sub id_to_point_name {
   my @ret;
 
   my @tri = Astro::HTM::Functions->name_to_triangle( $name );
+
   my ( @v0, @v1, @v2 );
   {
-    # Need to turn warnings off to prevent "Scalar value @tri[0] better
-    # written as $tri[0]" warning. We know that name_to_triangle() returns
-    # a 2D array, but Perl doesn't.
     no warnings;
     @v0 = @tri[0];
     @v1 = @tri[1];
@@ -318,9 +338,9 @@ sub id_to_point_name {
 
   my ( $center_x, $center_y, $center_z, $sum );
 
-  $center_x = $v0[0] + $v1[0] + $v2[0];
-  $center_y = $v0[1] + $v1[1] + $v2[1];
-  $center_z = $v0[2] + $v1[2] + $v2[2];
+  $center_x = $v0[0][0] + $v1[0][0] + $v2[0][0];
+  $center_y = $v0[0][1] + $v1[0][1] + $v2[0][1];
+  $center_z = $v0[0][2] + $v1[0][2] + $v2[0][2];
   $sum = sqrt( $center_x * $center_x + $center_y * $center_y + $center_z * $center_z );
   $center_x /= $sum;
   $center_y /= $sum;
@@ -345,18 +365,29 @@ sub isinside {
   my $v2 = shift; # array reference
   my $v3 = shift; # array reference
 
+  print "v1:\n" if $DEBUG;
+  print Dumper $v1 if $DEBUG;
+  print "v2:\n"if $DEBUG;
+  print Dumper $v2 if $DEBUG;
+  print "v3:\n" if $DEBUG;
+  print Dumper $v3 if $DEBUG;
+
   my $vec1 = vector( @$v1 );
   my $vec2 = vector( @$v2 );
   my $vec3 = vector( @$v3 );
   my $pvec = vector( @$p );
 
   if( ( $pvec . ( $vec1 x $vec2 ) ) < ( -1.0 * HTM__GEPSILON ) ) {
+    print "returning false from 1\n" if $DEBUG;
     return 0;
   }
   if( ( $pvec . ( $vec2 x $vec3 ) ) < ( -1.0 * HTM__GEPSILON ) ) {
+    print "returning false from 2\n" if $DEBUG;
+
     return 0;
   }
   if( ( $pvec . ( $vec3 x $vec1 ) ) < ( -1.0 * HTM__GEPSILON ) ) {
+    print "returning false from 3\n" if $DEBUG;
     return 0;
   }
   return 1;
@@ -373,7 +404,7 @@ sub lookup {
   my $y = shift; # scalar
   my $z = shift; # scalar
   my $depth = shift; #scalar
-
+print "x = $x y = $y z = $z\n" if $DEBUG;
   my $rstat = 0;
   my $startID;
   my $name = '';
@@ -385,11 +416,22 @@ sub lookup {
   $p[1] = $y;
   $p[2] = $z;
 
+  print "p: \n" if $DEBUG;
+  print Dumper \@p if $DEBUG;
+
   # Get the ID of the level 0 triangle and its starting vertices.
   $startID = Astro::HTM::Functions->startpane( \@v0, \@v1, \@v2, $x, $y, $z, \$name );
 
+  print "v vectors:\n" if $DEBUG;
+  print Dumper \@v0 if $DEBUG;
+  print Dumper \@v1 if $DEBUG;
+  print Dumper \@v2 if $DEBUG;
+
   # Start searching for the children.
   while( $depth-- > 0 ) {
+
+    print "in lookup: depth = $depth name = $name\n" if $DEBUG;
+
     Astro::HTM::Functions->m4_midpoint( \@v0, \@v1, \@w2 );
     Astro::HTM::Functions->m4_midpoint( \@v1, \@v2, \@w0 );
     Astro::HTM::Functions->m4_midpoint( \@v2, \@v0, \@w1 );
@@ -432,6 +474,8 @@ sub lookup_radec {
   my $depth = shift; # scalar
 
   my @v = Astro::HTM::Functions->radec_to_vector( $ra, $dec );
+  print "Vector as returned from radec_to_vector in lookup_radec:\n" if $DEBUG;
+  print Dumper \@v if $DEBUG;
   return Astro::HTM::Functions->lookup( @v, $depth );
 }
 
@@ -452,6 +496,8 @@ sub lookup_radec_id {
   $y = sin( $ra * HTM__PI_RADIANS ) * $cd;
   $z = sin( $dec * HTM__PI_RADIANS );
 
+  print "within lookup_radec_id: x = $x y = $y z = $z\n" if $DEBUG;
+
   return Astro::HTM::Functions->lookup_vector_id( $x, $y, $z, $depth );
 }
 
@@ -468,6 +514,8 @@ sub lookup_vector_id {
   my $depth = shift; # scalar
 
   my $name = Astro::HTM::Functions->lookup( $x, $y, $z, $depth );
+
+print "name within lookup_vector_id: $name\n" if $DEBUG;
   my $rstat = Astro::HTM::Functions->name_to_id( $name );
   return $rstat;
 }
@@ -488,6 +536,7 @@ sub m4_midpoint {
   $w->[2] = $v1->[2] + $v2->[2];
 
   my $tmp = sqrt( $w->[0] * $w->[0] + $w->[1] * $w->[1] + $w->[2] * $w->[2] );
+print "tmp = $tmp\n" if $DEBUG;
   $w->[0] /= $tmp;
   $w->[1] /= $tmp;
   $w->[2] /= $tmp;
@@ -520,14 +569,16 @@ sub name_to_id {
   my @name = split //, $name;
 
   for( $i = $siz - 1; $i > 0; $i-- ) {
+    print "Character at index $i is " . $name[$i] . "\n" if $DEBUG;
     if( $name[$i] > 3 || $name[$i] < 0 ) {
       croak "Character " . $name[$i] . " at index $i invalid";
     }
-    $out += $name[$i] << ( 2 * $siz - $i - 1 );
+    print "Adding " . ( $name[$i] << ( 2 * ( $siz - $i - 1 ) ) ) . " to out (total so far is $out)\n" if $DEBUG;
+    $out += $name[$i] << ( 2 * ( $siz - $i - 1 ) );
   }
 
   $i = 2;
-  if( $name[0] == 'N' ) {
+  if( $name[0] eq 'N' ) {
     $i++;
   }
   my $last = $i << ( 2 * $siz - 2 );
@@ -548,7 +599,7 @@ sub name_to_triangle {
 
   my $rstat = 0;
   my $dtmp = 0;
-  my ( @w0, @w1, @w2, @v0, @v1, @v2 );
+  my ( @w0, @w1, @w2, $v0, $v1, $v2 );
 
   my $k;
   my @anchor_offsets;
@@ -564,39 +615,54 @@ sub name_to_triangle {
     $anchor_offsets[2] = $N_indexes[$k][2];
   }
 
-  @v0 = @anchor[$anchor_offsets[0]];
-  @v1 = @anchor[$anchor_offsets[1]];
-  @v2 = @anchor[$anchor_offsets[2]];
+  my @temp = @anchor[$anchor_offsets[0]];
+  $v0->[0] = $temp[0][0];
+  $v0->[1] = $temp[0][1];
+  $v0->[2] = $temp[0][2];
+  @temp = @anchor[$anchor_offsets[1]];
+  $v1->[0] = $temp[0][0];
+  $v1->[1] = $temp[0][1];
+  $v1->[2] = $temp[0][2];
+  @temp = @anchor[$anchor_offsets[2]];
+  $v2->[0] = $temp[0][0];
+  $v2->[1] = $temp[0][1];
+  $v2->[2] = $temp[0][2];
+
+#  @v1 = @anchor[$anchor_offsets[1]];
+#  @v2 = @anchor[$anchor_offsets[2]];
+#print Dumper \@v0;
+#print Dumper \@v1;
+#print Dumper \@v2;
 
   my $offset = 2;
   my $len = length( $name );
   while( $offset < $len ) {
     my $s = $name[$offset];
 
-    Astro::HTM::Functions->m4_midpoint( \@v0, \@v1, \@w2 );
-    Astro::HTM::Functions->m4_midpoint( \@v1, \@v2, \@w0 );
-    Astro::HTM::Functions->m4_midpoint( \@v2, \@v0, \@w1 );
+    Astro::HTM::Functions->m4_midpoint( $v0, $v1, \@w2 );
+    Astro::HTM::Functions->m4_midpoint( $v1, $v2, \@w0 );
+    Astro::HTM::Functions->m4_midpoint( $v2, $v0, \@w1 );
 
     if( $s == 0 ) {
-      @v1 = @w2;
-      @v2 = @w1;
+      @$v1 = @w2;
+      @$v2 = @w1;
     } elsif( $s == 1 ) {
-      @v0 = @v1;
-      @v1 = @w0;
-      @v2 = @w2;
+      @$v0 = @$v1;
+      @$v1 = @w0;
+      @$v2 = @w2;
     } elsif( $s == 2 ) {
-      @v0 = @v2;
-      @v1 = @w1;
-      @v2 = @w0;
+      @$v0 = @$v2;
+      @$v1 = @w1;
+      @$v2 = @w0;
     } elsif( $s == 3 ) {
-      @v0 = @w0;
-      @v1 = @w1;
-      @v2 = @w2;
+      @$v0 = @w0;
+      @$v1 = @w1;
+      @$v2 = @w2;
     }
     $offset++;
   }
 
-  return ( @v0, @v1, @v2 );
+  return ( [ @$v0 ], [ @$v1 ], [ @$v2 ] );
 }
 
 =item B<radec_to_vector>
