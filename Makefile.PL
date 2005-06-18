@@ -15,9 +15,10 @@ WriteMakefile(
                         'Constraint',
                         'Convex',
                         'Domain',
+                        'Functions',
                         'Index',
                         'QuadNode',
-                        'Functions',
+                        'Range',
                        ],
               ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
                (ABSTRACT_FROM => 'HTM.pm',
