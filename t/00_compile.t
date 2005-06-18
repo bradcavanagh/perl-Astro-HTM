@@ -11,3 +11,4 @@ require_ok( 'Astro::HTM::Domain' );
 require_ok( 'Astro::HTM::QuadNode' );
 require_ok( 'Astro::HTM::Index' );
 require_ok( 'Astro::HTM::Functions' );
+require_ok( 'Astro::HTM::Range' );
