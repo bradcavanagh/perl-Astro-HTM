@@ -11,18 +11,13 @@ use strict;
 use warnings;
 use warnings::register;
 
-use Class::Struct layer => { level => '$',
-                             number_of_vertices => '$',
-                             number_of_nodes => '$',
-                             number_of_edges => '$',
-                             first_index => '$',
-                             first_vertex => '$',
-                           };
+use Astro::HTM::Layer;
 
 use Math::Trig qw/ acos atan /;
 use Math::VectorReal;
 
 use Astro::HTM::QuadNode;
+use Astro::HTM::Edge;
 
 our $VERSION = '0.01';
 
@@ -45,6 +40,8 @@ sub new {
   my $index = bless { ADDLEVEL => undef,
                       BUILDLEVEL => undef,
                       INDEX => undef,
+                      LAST_SAVED_LEAF_INDEX => undef,
+                      LAYERS => [],
                       LEAVES => undef,
                       MAXLEVEL => undef,
                       NODES => [],
@@ -82,8 +79,10 @@ sub new {
     }
   }
 
+#print "before configure\n";
   $index->configure( maxlevel => $maxlevel,
                      buildlevel => $buildlevel );
+#print "after configure\n";
 
   return $index;
 }
@@ -113,32 +112,34 @@ sub configure {
     $buildlevel = $maxlevel;
   }
 
+  $self->buildlevel( $buildlevel );
+  $self->maxlevel( $maxlevel );
   $self->addlevel( $maxlevel - $buildlevel );
   $self->v_max();
 
   my $n0 = new Astro::HTM::QuadNode();
   $n0->index( 0 );
-  $self->add_node( $n0 );
+  $self->add_node( 0, $n0 );
 
-  my $l0 = new layer;
+  my $l0 = new Astro::HTM::Layer;
   $l0->level( 0 );
   $l0->number_of_vertices( 6 );
   $l0->number_of_nodes( 8 );
   $l0->number_of_edges( 12 );
   $l0->first_index( 1 );
   $l0->first_vertex( 0 );
-  $self->add_layer( $l0 );
+  $self->add_layer( 0, $l0 );
 
   # Set the first six vertices.
-  my @v = [ [ 0, 0, 1 ],
+  my @v = ( [ 0, 0, 1 ],
             [ 1, 0, 0 ],
             [ 0, 1, 0 ],
             [ -1, 0, 0 ],
             [ 0, -1, 0 ],
-            [ 0, 0, -1 ] ];
+            [ 0, 0, -1 ] );
 
   for( my $i = 0; $i < 6; $i++ ) {
-    my $sv = vector( $v[$i] );
+    my $sv = vector( @{$v[$i]} );
     $self->add_vertex( $i, $sv );
   }
 
@@ -156,14 +157,14 @@ sub configure {
   my $pl = 0;
   my $level = $self->buildlevel;
   while( $level-- > 0 ) {
-    my $edge = new Astro::HTM::Edge( $self, $pl );
+    my $edge = new Astro::HTM::Edge( tree => $self, layerindex => $pl );
     $edge->make_midpoints();
     $self->make_new_layer( $pl );
     $pl++;
   }
-
+#print "before sort_index\n";
   $self->sort_index;
-
+#print "after sort_index\n";
   return $self;
 }
 
@@ -212,6 +213,27 @@ sub index {
   return $self->{INDEX};
 }
 
+=item B<last_saved_leaf_index>
+
+=cut
+
+sub last_saved_leaf_index {
+  my $self = shift;
+  if( @_ ) {
+    $self->{LAST_SAVED_LEAF_INDEX} = shift;
+  }
+  return $self->{LAST_SAVED_LEAF_INDEX};
+}
+
+=item B<layers>
+
+=cut
+
+sub layers {
+  my $self = shift;
+  return $self->{LAYERS};
+}
+
 =item B<leaves>
 
 =cut
@@ -236,6 +258,16 @@ sub maxlevel {
     $self->{MAXLEVEL} = $maxlevel;
   }
   return $self->{MAXLEVEL};
+}
+
+=item B<nodex>
+
+=cut
+
+sub nodes {
+  my $self = shift;
+
+  return $self->{NODES};
 }
 
 =item B<number_of_nodes>
@@ -277,11 +309,40 @@ sub stored_leaves {
   return $self->{STORED_LEAVES};
 }
 
+=item B<vertices>
+
+=cut
+
+sub vertices {
+  my $self = shift;
+
+  return $self->{VERTICES};
+}
+
 =back
 
 =head2 General Methods
 
 =over 4
+
+=item B<add_layer>
+
+=cut
+
+sub add_layer {
+  my $self = shift;
+  my $i = shift;
+  my $layer = shift;
+
+  if( $i > scalar( @{$self->{LAYERS}} ) ) {
+    ${$self->{LAYERS}}[$i] = $layer;
+  } else {
+    splice( @{$self->{LAYERS}},
+            $i,
+            ( -1 - $i ),
+            ( $layer, @{$self->{LAYERS}}[$i+1..-1] ) );
+  }
+}
 
 =item B<add_node>
 
@@ -289,9 +350,17 @@ sub stored_leaves {
 
 sub add_node {
   my $self = shift;
+  my $i = shift;
   my $node = shift;
 
-  push @{$self->{NODES}}, $node;
+  if( $i > scalar( @{$self->{NODES}} ) ) {
+    ${$self->{NODES}}[$i] = $node;
+  } else {
+    splice( @{$self->{NODES}},
+            $i,
+            ( -1 - $i ),
+            ( $node, @{$self->{NODES}}[$i+1..-1] ) );
+  }
 }
 
 =item B<add_vertex>
@@ -303,10 +372,18 @@ sub add_vertex {
   my $i = shift;
   my $vertex = shift;
 
-  splice( @{$self->{VERTICES}},
-          $i,
-          ( -1 - $i ),
-          ( $vertex, @{$self->{VERTICES}}[$i+1..-1] ) );
+
+  if( $i > scalar( @{$self->{VERTICES}} ) ) {
+    ${$self->{VERTICES}}[$i] = $vertex;
+  } else {
+    splice( @{$self->{VERTICES}},
+            $i,
+            ( -1 - $i ),
+            ( $vertex, @{$self->{VERTICES}}[$i+1..-1] ) );
+  }
+
+#  return $self->{VERTICES};
+
 }
 
 =item B<area>
@@ -396,7 +473,7 @@ sub id_by_leaf_number {
   my $self = shift;
   my $leaf = shift;
 
-  return ( scalar( $self->leaves ) + $leaf );
+  return ( scalar( @{$self->leaves} ) + $leaf );
 }
 
 =item B<is_leaf>
@@ -418,7 +495,7 @@ sub leaf_number_by_id {
   my $self = shift;
   my $id = shift;
 
-  return ( $id - scalar( $self->leaves ) );
+  return ( $id - scalar( @{$self->leaves} ) );
 }
 
 =item B<lookup_radec>
@@ -479,12 +556,12 @@ sub make_new_layer {
   my $id;
   my $newlayer = $oldlayer + 1;
 
-  my $newl = new layer;
+  my $newl = new Astro::HTM::Layer;
   $self->add_layer( $newlayer, $newl );
 
   my $oldl = $self->get_layer( $oldlayer );
   $newl->level( $oldl->level + 1 );
-  $newl->number_of_vertice( $oldl->number_of_vertices + $oldl->number_of_edges );
+  $newl->number_of_vertices( $oldl->number_of_vertices + $oldl->number_of_edges );
   $newl->number_of_nodes( 4 * $oldl->number_of_nodes );
   $newl->number_of_edges( $newl->number_of_nodes + $newl->number_of_vertices - 1 );
   $newl->first_index( $self->index );
@@ -613,6 +690,19 @@ sub node_vertex_ids {
   return @{$node->v};
 }
 
+=item B<set_node>
+
+=cut
+
+sub set_node {
+  my $self = shift;
+
+  my $index = shift;
+  my $node = shift;
+#print "setting node at index $index\n";
+  ${$self->{NODES}}[$index] = $node;
+}
+
 =item B<show_vertices>
 
 =cut
@@ -633,14 +723,17 @@ sub sort_index {
   my $self = shift;
 
   my $oldnodes = $self->nodes;
-  my ( $index, $nonleaf, $leaf );
 
-  for( $index = IOFFSET, $leaf = IOFFSET, $nonleaf = ( scalar( $self->nodes ) - 1 );
-       $index < scalar( $self->nodes );
+  my ( $index, $nonleaf, $leaf );
+  $nonleaf = scalar( @{$self->nodes} );
+
+  for( $index = IOFFSET, $leaf = IOFFSET ;
+       $index < scalar( @{$self->nodes} );
        $index++ ) {
-    my $childid = $oldnodes->[$index]->childid;
+#print "index: $index, leaf: $leaf, nonleaf: $nonleaf\n";
+    my $childid = $oldnodes->[$index]->child_id;
     if( $childid->[0] == 0 ) {
-      $self->set_nodes( $leaf, $oldnodes->[$index] );
+      $self->set_node( $leaf, $oldnodes->[$index] );
       for( my $i = 0; $i < 4; $i++ ) {
         my $leafn = $self->get_node( $leaf );
         my $parent = $self->get_node( $leafn->parent );
@@ -661,10 +754,11 @@ sub sort_index {
       $oldnodes->[$N_childid->[3]]->parent( $nonleaf );
 
       for( my $i = 0; $i < 4; $i++ ) {
-        my $pn1 = $self->get_nodes( $N->parent );
+#        print "n_parent is " . $N->parent . "\n";
+        my $pn1 = $self->get_node( $N->parent );
         my $pn1_childid = $pn1->child_id;
         if( $pn1_childid->[$i] == $index ) {
-          $pn1->childid->[$i] = $nonleaf;
+          $pn1->child_id->[$i] = $nonleaf;
           last;
         }
       }

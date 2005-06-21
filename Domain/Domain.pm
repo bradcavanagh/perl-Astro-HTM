@@ -296,18 +296,16 @@ sub intersect {
   my %args = @_;
 
   if( ! defined( $args{'index'} ) ||
-      ! UNIVERSAL::isa( $args{'index'}, "Astro::HTM::Index" ) ) {
-    croak "Index must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Index
- object";
+      ! UNIVERSAL::isa( ${$args{'index'}}, "Astro::HTM::Index" ) ) {
+    croak "Index must be passed to Astro::HTM::Convex::intersect() as a reference to an Astro::HTM::Index object";
   }
-  my $index = $args{'index'};
+  my $index_ref = $args{'index'};
 
   if( ! defined( $args{'range'} ) ||
-      ! UNIVERSAL::isa( $args{'range'}, "Astro::HTM::Range" ) ) {
-    croak "Range must be passed to Astro::HTM::Convex::test_trixel() as an Astro::HTM::Range
- object";
+      ! UNIVERSAL::isa( ${$args{'range'}}, "Astro::HTM::Range" ) ) {
+    croak "Range must be passed to Astro::HTM::Convex::intersect() as a reference to an Astro::HTM::Range object";
   }
-  my $range = $args{'range'};
+  my $range_ref = $args{'range'};
 
   my $varlen;
   if( ! defined( $args{'varlen'} ) ) {
@@ -317,10 +315,11 @@ sub intersect {
   }
 
   my $i;
-  for( $i = 0; $i < scalar( $self->convexes ); $i++ ) {
+  for( $i = 0; $i < scalar( @{$self->convexes} ); $i++ ) {
+print "calling convex::intersect for convex $i\n";
     my $convex = $self->get_convex( $i );
-    $convex->intersect( index => $index,
-                        range => $range,
+    $convex->intersect( index => $index_ref,
+                        range => $range_ref,
                         varlen => $varlen );
   }
 

@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use warnings::register;
 
-use Algorithm::SkipList;
+use Set::Infinite;
 use Storable qw/ dclone /;
 
 use Astro::HTM::Constants qw/ :range /;
@@ -67,7 +67,10 @@ sub is_in_lohi {
   my $a = shift; # scalar;
   my $b = shift; # scalar;
 
-  return $rstat;
+  my $range = new Set::Infinite( $a, $b );
+  $range->integer;
+
+  return $self->is_in_range( $range );
 }
 
 =item B<is_in_range>
@@ -82,6 +85,7 @@ sub is_in_range {
   my $set1 = $self->range;
   my $set2 = $other->range;
 
+  my $rel;
   if( $set2->is_subset( $set1 ) ) {
     $rel = 1;
   } elsif( $set2->is_disjoint( $set1 ) ) {
@@ -102,7 +106,54 @@ sub merge_range {
   my $lo = shift; # scalar
   my $hi = shift; # scalar
 
-  $self->range( $self->range->union( $lo, $hi ) );
+  my $newrange = new Set::Infinite( $lo, $hi );
+  if( ! defined( $self->range ) ) {
+    $self->range( $newrange->integer );
+  } else {
+    $self->range( $self->range->union( $newrange->integer ) );
+  }
 }
+
+=item B<to_string>
+
+=cut
+
+sub to_string {
+  my $self = shift;
+
+  my $symb = shift;
+  my $which = lc( shift );
+
+  if( ! defined( $symb ) ) {
+    $symb = 0;
+  }
+
+  if( ! defined( $which ) ||
+      length( $which . "" ) == 0 ) {
+    $which = "both";
+  }
+
+  my $string = '';
+  $self->range->iterate( sub {
+                           if( ( $which eq 'lows' ) || ( $which eq 'both' ) ) {
+                             $string .= ( $symb ?
+                                          Astro::HTM::Functions->id_to_name( $_[0]->min ) :
+                                          $_[0]->min );
+                           }
+                           if( $which eq 'both' ) {
+                             $string .= " ";
+                           }
+                           if( $which eq 'highs' || $which eq 'both' ) {
+                             $string .= ( $symb ?
+                                          Astro::HTM::Functions->id_to_name( $_[0]->max ) :
+                                          $_[0]->max );
+                           }
+                           $string .= "\n";
+                         } );
+
+  return $string;
+}
+
+
 
 1;
