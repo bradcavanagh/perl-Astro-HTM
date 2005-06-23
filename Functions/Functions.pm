@@ -32,7 +32,9 @@ use Math::VectorReal;
 use Astro::HTM::Convex;
 use Astro::HTM::Constraint;
 use Astro::HTM::Domain;
+use Astro::HTM::Edge;
 use Astro::HTM::Index;
+use Astro::HTM::Layer;
 use Astro::HTM::QuadNode;
 
 use Astro::HTM::Constants qw/ :all /;

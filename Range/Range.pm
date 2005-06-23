@@ -132,7 +132,7 @@ sub to_string {
       length( $which . "" ) == 0 ) {
     $which = "both";
   }
-
+print "which = $which\n";
   my $string = '';
   $self->range->iterate( sub {
                            if( ( $which eq 'lows' ) || ( $which eq 'both' ) ) {

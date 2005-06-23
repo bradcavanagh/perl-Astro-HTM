@@ -22,6 +22,8 @@ my %seen;
 
 our $VERSION = '0.01';
 
+our $VERBOSE = 0;
+
 =head1 METHODS
 
 =head2 Constructor
@@ -113,11 +115,7 @@ sub new {
 
     # The following is essentially copied from the Java implementation
     # of the Convex constructor.
-    my $i;
-    my $j;
-    my $k;
-    my $l;
-    my $m;
+    my ( $i, $j, $k, $l, $m );
     for( $i = 0, $k = 0 ; $i < 4 ; $i++ ) {
       for( $j = $i+1; $j < 4; $j++, $k++ ) {
         $d[$k] = $v[$i] x $v[$j];
@@ -507,11 +505,11 @@ sub esolve {
   my $root2 = -1;
   my $i = 0;
 
-  if( $a > HTM__GEPSILON || $a < -1.0 * HTM__GEPSILON ) {
+  if( ( $a > HTM__GEPSILON ) || ( $a < ( -1.0 * HTM__GEPSILON ) ) ) {
     $root1 = $q / $a;
     $i++;
   }
-  if( $q > HTM__GEPSILON || $q < -1.0 * HTM__GEPSILON ) {
+  if( ( $q > HTM__GEPSILON ) || ( $q < ( -1.0 * HTM__GEPSILON ) ) ) {
     $root2 = $c / $q;
     $i++;
   }
@@ -619,12 +617,10 @@ sub intersect {
   }
 
   for( my $i = 1; $i <= 8; $i++ ) {
-#    print "testing trixel of ID $i...";
     $self->test_trixel( id => $i,
                         index => $index_ref,
                         range => $range_ref,
                         varlen => $varlen );
-#    print "done\n";
   }
 }
 
@@ -727,11 +723,13 @@ sub save_trixel {
     croak "HTM ID must be passed to Astro::HTM::Convex::save_trixel()";
   }
   my $htmid = $args{'htmid'};
+
   if( ! defined( $args{'range'} ) ||
       ! UNIVERSAL::isa( ${$args{'range'}}, "Astro::HTM::Range" ) ) {
     croak "Range must be passed to Astro::HTM::Convex::save_trixel() as a reference to an Astro::HTM::Range object";
   }
   my $range_ref = $args{'range'};
+
   my $varlen;
   if( ! defined( $args{'varlen'} ) ) {
     $varlen = 0;
@@ -826,6 +824,9 @@ sub simplify {
   # If we have a HTM__ZERO convex, use simplify_zero instead.
   if( $self->sign == HTM__ZERO ) {
     $self->simplify_zero();
+    if( $VERBOSE ) {
+      print " simplify0 \n";
+    }
     return;
   }
 
@@ -868,10 +869,11 @@ sub simplify {
           if( $test == 1 ) {
             # Remove $cj from the list of constraints.
             $self->remove_constraint( $j );
-          }
-          if( $test == 2 ) {
+          } elsif( $test == 2 ) {
             # Remove $ci from the list of constraints.
             $self->remove_constraint( $i );
+          } else {
+            next;
           }
 
           $redundancy = 1;
@@ -890,10 +892,11 @@ sub simplify {
           if( $test == 1 ) {
             # Remove $cj from the list of constraints.
             $self->remove_constraint( $j );
-          }
-          if( $test == 2 ) {
+          } elsif( $test == 2 ) {
             # Remove $ci from the list of constraints.
             $self->remove_constraint( $i );
+          } else {
+            next;
           }
 
           $redundancy = 1;
@@ -931,20 +934,21 @@ sub simplify {
   } # while redundancy loop
 
   # Reset the sign of the convex.
-  my $sign = $self->get_constraint( 0 )->sign;
+  $self->{SIGN} = $self->get_constraint( 0 )->sign;
+
   for( my $i = 1; $i < scalar( @{$self->constraints} ); $i++ ){
     my $ci = $self->get_constraint( $i );
-    if( $sign == HTM__NEGATIVE ) {
+    if( $self->sign == HTM__NEGATIVE ) {
       if( $ci->sign == HTM__POSITIVE ) {
         $self->{SIGN} = HTM__MIXED;
         last;
       }
-    } elsif( $sign == HTM__POSITIVE ) {
+    } elsif( $self->sign == HTM__POSITIVE ) {
       if( $ci->sign == HTM__NEGATIVE ) {
         $self->{SIGN} = HTM__MIXED;
         last;
       }
-    } elsif( $sign == HTM__ZERO ) {
+    } elsif( $self->sign == HTM__ZERO ) {
       $self->{SIGN} = $ci->sign;
       last;
     }
@@ -957,6 +961,10 @@ sub simplify {
 
 sub simplify_zero {
   my $self = shift;
+
+  if( $VERBOSE ) {
+    print "Simplif0 : " . scalar( @{$self->constraings} ) . "\n";
+  }
 
   if( scalar( @{$self->constraints} ) == 1 ) {
 
@@ -976,18 +984,22 @@ sub simplify_zero {
         ( $v1->y == $v2->y ) &&
         ( $v1->z == $v2->z ) ) {
       $self->remove_constraint( 1 );
+      $self->bounding_circle( $self->get_constraint( 0 ) );
       return;
     }
 
     if( ( $v1->x == -1.0 * $v2->x ) &&
         ( $v1->y == -1.0 * $v2->y ) &&
         ( $v1->z == -1.0 * $v2->z ) ) {
-      $self->clear_constraints();
+      $self->clear_constraints;
       return;
     }
 
     my $v = $v1 + $v2;
     $v->norm;
+    if( $VERBOSE ) {
+      print "2Constr bounding circle: " . $v;
+    }
     $self->bounding_circle( new Astro::HTM::Constraint( direction => $v,
                                                         distance => 0 ) );
   }
@@ -1001,7 +1013,7 @@ sub simplify_zero {
 
   # As for simplify(), this code is taken pretty much verbatim from
   # the Java implementation.
-  for( $i = 0; $i < scalar( @{$self->constraints} ); $i++ ) {
+  for( $i = 0; ( $i < scalar( @{$self->constraints} ) - 1 ); $i++ ) {
 
     my $ruledout = 1;
     for( $j = $i+1; $j < scalar( @{$self->constraints} ); $j++ ) {
@@ -1146,6 +1158,7 @@ sub simplify_zero {
         }
         $self->add_corner( $corner[$k] );
         $c = $corner_constr1[$k];
+        last;
       }
     }
   }
@@ -1232,7 +1245,7 @@ sub test_bounding_circle {
   # Set the correct opening angle.
   my $d = acos( $c . $vector1 );
 
-  if( $self->sign == HTM__NEGATIVE ) {
+  if( $self->sign == HTM__ZERO ) {
     my $bc = $self->bounding_circle;
     my $tst = $c . $bc->direction;
     if( ( ( $tst < ( -1.0 + HTM__GEPSILON ) ) ? HTM__PI : acos( $tst ) ) >
@@ -1499,6 +1512,8 @@ sub test_edge_zero {
     my $cj = $self->get_corner( $j );
     my $cedgelen = acos( $ci . $cj );
 
+    print " corners = " . scalar( @{$self->corners} ) . "\n" if $VERBOSE;
+
     for( my $iedge = 0; $iedge < 3; $iedge++ ) {
 
       my $a1 = $edge[$iedge]->e x ( $ci x $cj );
@@ -1510,12 +1525,12 @@ sub test_edge_zero {
       for( my $k = 0; $k < 2; $k++ ) {
         my $l1 = acos( $ci . $a1 );
         my $l2 = acos( $cj . $a1 );
-        if( ( $l1 - $cedgelen <= HTM__GEPSILON ) &&
-            ( $l2 - $edge[$iedge]->l <= HTM__GEPSILON ) ) {
+        if( ( ( $l1 - $cedgelen ) <= HTM__GEPSILON ) &&
+            ( ( $l2 - $edge[$iedge]->l ) <= HTM__GEPSILON ) ) {
           $l1 = acos( $edge[$iedge]->e1 . $a1 );
           $l2 = acos( $edge[$iedge]->e2 . $a1 );
-          if( ( $l1 - $edge[$iedge]->l <= HTM__GEPSILON ) &&
-              ( $l2 - $edge[$iedge]->l <= HTM__GEPSILON ) ) {
+          if( ( ( $l1 - $edge[$iedge]->l ) <= HTM__GEPSILON ) &&
+              ( ( $l2 - $edge[$iedge]->l ) <= HTM__GEPSILON ) ) {
 
             return 1;
           }
@@ -1633,7 +1648,11 @@ sub test_node {
   my $vsum = $self->test_vertex( vector => $V0 ) +
              $self->test_vertex( vector => $V1 ) +
              $self->test_vertex( vector => $V2 );
-#print "vsum is $vsum\n";
+
+  if( $VERBOSE ) {
+    print Astro::HTM::Functions->id_to_name( $N->id ) . "\n";
+  }
+
   my $mark = $self->test_triangle( vector1 => $V0,
                                    vector2 => $V1,
                                    vector3 => $V2,
@@ -1644,6 +1663,11 @@ sub test_node {
   # safe side, mark them as HTM__MARKUP_PARTIAL.
   if( ( $quadnode_childids->[0] == 0 ) && ( $mark == HTM__MARKUP_DONTKNOW ) ) {
     $mark = HTM__MARKUP_PARTIAL;
+  }
+
+  if( $VERBOSE ) {
+    print " Mark = $mark\n";
+    print "$V0 $V1 $V2";
   }
 
   return $mark;
@@ -1925,7 +1949,7 @@ sub test_partial {
                            id => $ids[2],
                            vector1 => $vector3,
                            vector2 => $w1,
-                           vector3 => $w2,
+                           vector3 => $w0,
                            pprev => $P,
                            index => $index_ref,
                            range => $range_ref,
@@ -1991,37 +2015,32 @@ sub test_triangle {
 
   # Quick check for partial.
   if( $vsum == 1 || $vsum == 2 ) {
-print "returning PARTIAL1 from test_triangle\n";
     return HTM__MARKUP_PARTIAL;
   }
 
   # Check for vsum == 3.
   if( $vsum == 3 ) {
     if( ( $self->sign == HTM__POSITIVE ) || ( $self->sign == HTM__ZERO ) ) {
-print "returning FULL1 from test_triangle\n";
       return HTM__MARKUP_FULL;
     }
     if( $self->test_hole( vector1 => $vector1,
                           vector2 => $vector2,
                           vector3 => $vector3 ) ) {
-print "returning PARTIAL2 from test_triangle\n";
       return HTM__MARKUP_PARTIAL;
     }
     if( $self->test_edge( vector1 => $vector1,
                           vector2 => $vector2,
                           vector3 => $vector3 ) ) {
-print "returning PARTIAL3 from test_triangle\n";
       return HTM__MARKUP_PARTIAL;
     }
-print "returning FULL2 from test_triangle\n";
     return HTM__MARKUP_FULL;
   }
 
   # If we've reached this far, we have vsum == 0.
+  print " vsum = 0 \n" if $VERBOSE;
   if( ! $self->test_bounding_circle( vector1 => $vector1,
                                      vector2 => $vector2,
                                      vector3 => $vector3 ) ) {
-print "returning REJECT1 from test_triangle\n";
     return HTM__MARKUP_REJECT;
   }
   if( ( $self->sign == HTM__POSITIVE ) ||
@@ -2043,21 +2062,16 @@ print "returning REJECT1 from test_triangle\n";
                                            vector2 => $vector2,
                                            vector3 => $vector3,
                                            cindex => $cindex ) ) {
-print "returning PARTIAL4 from test_triangle\n";
           return HTM__MARKUP_PARTIAL;
         } elsif( $cindex_constraint->contains( $vector1 ) ) {
-print "returning PARTIAL5 from test_triangle\n";
           return HTM__MARKUP_PARTIAL;
         } else {
-print "returning REJECT2 from test_triangle\n";
           return HTM__MARKUP_REJECT;
         }
       } else {
         if( ( $self->sign == HTM__POSITIVE ) || ( $self->sign == HTM__ZERO ) ) {
-print "returning PARTIAL6 from test_triangle\n";
           return HTM__MARKUP_PARTIAL;
         } else {
-print "returning DONTKNOW1 from test_triangle\n";
           return HTM__MARKUP_DONTKNOW;
         }
       }
@@ -2067,29 +2081,23 @@ print "returning DONTKNOW1 from test_triangle\n";
                                            vector2 => $vector2,
                                            vector3 => $vector3,
                                            cindex => 0 ) ) {
-print "returning PARTIAL7 from test_triangle\n";
           return HTM__MARKUP_PARTIAL;
         } else {
-print "returning REJECT3 from test_triangle\n";
           return HTM__MARKUP_REJECT;
         }
       } else {
-print "returning DONTKNOW2 from test_triangle\n";
         return HTM__MARKUP_DONTKNOW;
       }
     }
   } elsif( $self->sign == HTM__ZERO ) {
     if( scalar( @{$self->corners} ) > 0 && $self->test_edge_zero( vector1 => $vector1,
-                                                               vector2 => $vector2,
-                                                               vector3 => $vector3 ) ) {
-print "returning PARTIAL8 from test_triangle\n";
+                                                                  vector2 => $vector2,
+                                                                  vector3 => $vector3 ) ) {
       return HTM__MARKUP_PARTIAL;
     } else {
-print "returning REJECT4 from test_triangle\n";
       return HTM__MARKUP_REJECT;
     }
   }
-print "returning PARTIAL9 from test_triangle\n";
   return HTM__MARKUP_PARTIAL;
 
 }
@@ -2143,18 +2151,9 @@ sub test_trixel {
 
   my ( $mark, $child_id, $tid );
 
-#print "retrieving index node of ID $id\n";
   my $index_node = ${$index_ref}->get_node( $id );
 
-#print "testing node with node_index $id...";
   $mark = $self->test_node( node_index => $id, index => ${$index_ref} );
-#print "done, mark = $mark\n";
-
-$seen{$id}++;
-  if( $seen{$id} > 1 ) {
-    print " *** *** *** we've seen node $id before (" . $seen{$id} . " times)!\n";
-    return HTM__MARKUP_REJECT;
-  }
 
   if( $mark == HTM__MARKUP_FULL ) {
     $tid = $index_node->id;
@@ -2173,7 +2172,7 @@ $seen{$id}++;
 
     $tid = $index_node->id;
     $child_id = $child_ids->[0];
-#print "calling test_trixel with child id $child_id\n";
+
     $self->test_trixel( id => $child_id,
                         index => $index_ref,
                         range => $range_ref,
@@ -2268,10 +2267,9 @@ sub test_vector_inside {
   if( ( ( ( $vector1 x $vector2 ) . $vector4 ) < 0 ) ||
       ( ( ( $vector2 x $vector3 ) . $vector4 ) < 0 ) ||
       ( ( ( $vector3 x $vector1 ) . $vector4 ) < 0 ) ) {
-print "vector does not lie inside other three vectors\n";
     return 0;
   }
-print "vector does lie inside other three vectors\n";
+
   return 1;
 }
 
@@ -2298,10 +2296,6 @@ sub test_vertex {
 
   for( my $i = 0; $i < scalar( @{$self->constraints} ); $i++ ) {
     my $ci = $self->get_constraint( $i );
-#print "ci direction: " . $ci->direction;
-#print "vector: " . $vector;
-#print "ci distance: " . $ci->distance . "\n";
-#print "dot product: " . ( $ci->direction . $vector ) . "\n";
     if( ( $ci->direction . $vector ) < $ci->distance ) {
       return 0;
     }
