@@ -2,6 +2,7 @@
 
 use strict;
 use Test::More tests => 40;
+use Config;
 
 BEGIN {
   use_ok( 'Astro::HTM::Constants', qw/ :all / );
@@ -34,21 +35,16 @@ require_ok( 'Astro::HTM::Functions' );
     ok( $returned_radec_id10 == $radec_id10, "Converting RA and Dec to level 10 HTM ID via lookup_radec_id()" );
   }
 
-# Test RA/Dec to level 20 HTM ID (this checks 64-bit integers).
+SKIP: {
+  skip "64-bit integers required", 19 unless $Config{'ivsize'} >= 8;
+
+  # Test RA/Dec to level 20 HTM ID (this checks 64-bit integers).
   {
     my $ra20 = 10;
     my $dec20 = 10;
     my $radec_id20 = 17098002819647;
     my $returned_radec_id20 = Astro::HTM::Functions->lookup_radec_id( $ra20, $dec20, 20 );
     ok( $returned_radec_id20 == $radec_id20, "Converting RA and Dec to level 20 HTM id via lookup_radec_id()" );
-  }
-
-# Test level 10 HTM ID to name.
-  {
-    my $id10 = 16305926;
-    my $name10 = "N32030330012";
-    my $returned_name10 = Astro::HTM::Functions->id_to_name( $id10 );
-    ok( $returned_name10 eq $name10, "Converting level 10 HTM ID to name via id_to_name()" );
   }
 
 # Test level 20 HTM ID to name.
@@ -59,75 +55,7 @@ require_ok( 'Astro::HTM::Functions' );
     ok( $returned_name20 eq $name20, "Converting level 20 HTM ID to name via id_to_name()" );
   }
 
-# Test some conversions of RA/Dec to level 10 names.
-  {
-    my $ra = 10;
-    my $dec = 10;
-    my $level = 10;
-    my $name = "N32030330012";
-    my $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 45;
-    $dec = 45;
-    $name = "N33313333303";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 90;
-    $dec = -45;
-    $name = "S10102012001";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 180;
-    $dec = 85;
-    $name = "N12200000001";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 275;
-    $dec = -85;
-    $name = "S31000200223";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-  }
-
-# Test some conversions of RA/Dec to level 14 names.
-  {
-    my $ra = 10;
-    my $dec = 10;
-    my $level = 14;
-    my $name = "N320303300120212";
-    my $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 45;
-    $dec = 45;
-    $name = "N333133333033333";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 90;
-    $dec = -45;
-    $name = "S101020120012010";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 180;
-    $dec = 85;
-    $name = "N122000000012010";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-
-    $ra = 275;
-    $dec = -85;
-    $name = "S310002002230232";
-    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
-    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
-  }
-
-# Test some conversions of RA/Dec to level 20 names.
+  # Test some conversions of RA/Dec to level 20 names.
   {
     my $ra = 10;
     my $dec = 10;
@@ -234,7 +162,7 @@ require_ok( 'Astro::HTM::Functions' );
 
   }
 
-# Test lookup from vector.
+  # Test lookup from vector.
   {
     my $x = -0.0871557427476581;
     my $y = 0;
@@ -244,6 +172,86 @@ require_ok( 'Astro::HTM::Functions' );
     my $returned_name = Astro::HTM::Functions->lookup( $x, $y, $z, $level );
     ok( $returned_name eq $name, "Converting vector to level $level name via lookup" );
   }
+
+} # End SKIP block
+
+# Test level 10 HTM ID to name.
+  {
+    my $id10 = 16305926;
+    my $name10 = "N32030330012";
+    my $returned_name10 = Astro::HTM::Functions->id_to_name( $id10 );
+    ok( $returned_name10 eq $name10, "Converting level 10 HTM ID to name via id_to_name()" );
+  }
+
+# Test some conversions of RA/Dec to level 10 names.
+  {
+    my $ra = 10;
+    my $dec = 10;
+    my $level = 10;
+    my $name = "N32030330012";
+    my $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 45;
+    $dec = 45;
+    $name = "N33313333303";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 90;
+    $dec = -45;
+    $name = "S10102012001";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 180;
+    $dec = 85;
+    $name = "N12200000001";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 275;
+    $dec = -85;
+    $name = "S31000200223";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+  }
+
+# Test some conversions of RA/Dec to level 14 names.
+  {
+    my $ra = 10;
+    my $dec = 10;
+    my $level = 14;
+    my $name = "N320303300120212";
+    my $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 45;
+    $dec = 45;
+    $name = "N333133333033333";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 90;
+    $dec = -45;
+    $name = "S101020120012010";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 180;
+    $dec = 85;
+    $name = "N122000000012010";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+
+    $ra = 275;
+    $dec = -85;
+    $name = "S310002002230232";
+    $returned_name = Astro::HTM::Functions->lookup_radec( $ra, $dec, $level );
+    ok( $returned_name eq $name, "Converting RA/Dec to level $level name via lookup_radec (RA=$ra, Dec=$dec)" );
+  }
+
+
 
 # Test converting from vector to ID and back.
   {
