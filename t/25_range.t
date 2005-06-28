@@ -2,15 +2,10 @@
 
 use strict;
 use Test::More qw/ no_plan /;
-use Algorithm::SkipList;
 
 require_ok( 'Astro::HTM::Range' );
 
-my $my_los1 = new Algorithm::SkipList;
-my $my_his1 = new Algorithm::SkipList;
-
-my $range = new Astro::HTM::Range( my_los => $my_los1,
-                                   my_his => $my_his1 );
+my $range = new Astro::HTM::Range();
 
 isa_ok( $range, 'Astro::HTM::Range' );
 
