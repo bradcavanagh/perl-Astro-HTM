@@ -5,6 +5,11 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
               'DISTNAME' => 'Astro-HTM-Range',
               'NAME' => 'Astro::HTM::Range',
+              'PREREQ_PM' => {
+                              'Set::Infinite' => 0,
+                              'Class::Struct' => 0,
+                              'Storable' => 0,
+                             },
               'VERSION_FROM' => 'Range.pm',
               ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
                (ABSTRACT_FROM => 'Range.pm',
