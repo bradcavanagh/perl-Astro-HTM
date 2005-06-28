@@ -20,6 +20,8 @@ use Class::Struct 'Astro::HTM::Range' => {
                                           range => 'Set::Infinite',
                                          };
 
+our $VERSION = '0.01';
+
 =item B<add_range>
 
 =cut

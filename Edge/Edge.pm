@@ -9,6 +9,8 @@ use Carp;
 use Astro::HTM::Index;
 use Astro::HTM::Layer;
 
+our $VERSION = '0.01';
+
 sub new {
   my $proto = shift;
   my $class = ref( $proto ) || $proto;
