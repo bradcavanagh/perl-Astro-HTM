@@ -32,7 +32,12 @@ sub add_range {
   my $lo = shift; # scalar
   my $hi = shift; # scalar
 
-  $self->range->union( $lo, $hi );
+  if( defined( $self->range ) ) {
+    $self->range->union( $lo, $hi );
+  } else {
+    my $range = new Set::Infinite( $lo, $hi );
+    $self->range( $range );
+  }
 }
 
 =item B<compare>
