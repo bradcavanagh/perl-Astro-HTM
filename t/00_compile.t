@@ -1,7 +1,7 @@
 #!perl
 
 use strict;
-use Test::More tests => 8;
+use Test::More tests => 10;
 
 require_ok( 'Astro::HTM' );
 require_ok( 'Astro::HTM::Constants' );
