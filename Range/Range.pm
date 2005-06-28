@@ -15,6 +15,7 @@ use Set::Infinite;
 use Storable qw/ dclone /;
 
 use Astro::HTM::Constants qw/ :range /;
+use Astro::HTM::Functions;
 
 use Class::Struct 'Astro::HTM::Range' => {
                                           range => 'Set::Infinite',
@@ -33,7 +34,8 @@ sub add_range {
   my $hi = shift; # scalar
 
   if( defined( $self->range ) ) {
-    $self->range->union( $lo, $hi );
+    my $range = $self->range->union( $lo, $hi );
+    $self->range( $range );
   } else {
     my $range = new Set::Infinite( $lo, $hi );
     $self->range( $range );
@@ -123,10 +125,14 @@ sub merge_range {
 
 =item B<to_string>
 
+This method is currently not implemented.
+
 =cut
 
 sub to_string {
   my $self = shift;
+
+  return;
 
   my $symb = shift;
   my $which = lc( shift );
@@ -139,7 +145,7 @@ sub to_string {
       length( $which . "" ) == 0 ) {
     $which = "both";
   }
-print "which = $which\n";
+
   my $string = '';
   $self->range->iterate( sub {
                            if( ( $which eq 'lows' ) || ( $which eq 'both' ) ) {
