@@ -19,7 +19,7 @@ Makefile.PL
 QuadNode/QuadNode.pm
 QuadNode/Makefile.PL
 Range/Range.pm
-Range/Range.PL
+Range/Makefile.PL
 t/00_compile.t
 t/01_constants.t
 t/02_quadnode.t
